@@ -48,17 +48,14 @@ end
 
 open program
 
-set_option pp.universes true
-
-def map_list : pointer → program unit :=
-mfix (λ map_list p,
-if h : p = 0
+def map_list : pointer → program unit := by apply
+fix (λ map_list p,
+if p = 0
 then return ()
 else do
   modify p (+1),
-  p' ← read_nth p 1 2 dec_trivial,
+  p' ← read_nth p 1 2,
   map_list p'.to_ptr)
-sorry
 
 lemma map_list_def (p : pointer)
 : map_list p =
@@ -118,23 +115,13 @@ lemma lift_ite (p : Prop) [decidable p] (f g : α → β) (x : α)
 : (if p then f else g) x = if p then f x else g x :=
 by { by_cases p with h, simp [if_pos h], simp [if_neg h] }
 
-def list_reverse_aux : ∀ (p r : pointer),  program pointer :=
-mfix2 (λ list_reverse_aux p r,
+def list_reverse_aux : ∀ (p r : pointer),  program pointer := by apply
+fix2 (λ list_reverse_aux p r,
 if p = 0 then return r
 else do
   p' ← read_nth p 1 2,
   write_nth p 1 2 ⟨ r ⟩,
   list_reverse_aux p'.to_ptr p)
-begin
-  simp [monotonic2,uncurry',curry,lift_ite],
-  apply ite_monotonic,
-  { apply pure_monotonic },
-  { apply has_fix.bind_monotonic', intro,
-    cases y,
-    apply has_fix.bind_monotonic', intro,
-    cases y,
-    apply rec_monotonic, }
-end
 
 lemma list_reverse_aux_def (p r : pointer)
 : list_reverse_aux p r =
@@ -213,15 +200,14 @@ lemma list_reverse_spec' (p : pointer) (vs : list word)
                          post := λ q, is_list q (list.reverse vs) } :=
 sorry
 
-def list_reverse_dup_aux : pointer → pointer → program pointer :=
-mfix2 (λ list_reverse_dup_aux p q,
+def list_reverse_dup_aux : pointer → pointer → program pointer := by apply
+fix2 (λ list_reverse_dup_aux p q,
 if p = 0 then return q
 else do
   x  ← read_nth p 0 2 dec_trivial,
   q' ← alloc [x,⟨ q ⟩],
   p' ← read_nth p 1 2 dec_trivial,
   list_reverse_dup_aux p'.to_ptr q')
-sorry
 
 lemma list_reverse_dup_aux_def (p q : pointer)
 : list_reverse_dup_aux p q =
