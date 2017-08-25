@@ -242,10 +242,9 @@ begin
   case cons y ys
   { unfold is_list,
     extract_context h,
-    s_exists `nx,
+    s_exists nx,
     rw [list_reverse_dup_aux_def,if_neg h],
     bind_step ry with h₀,
---     extract_context [`h₀],
     bind_step q' with h₁,
     bind_step p' with h₂,
     unfold nth_le at *,

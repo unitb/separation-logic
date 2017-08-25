@@ -192,9 +192,21 @@ meta def get_pi_expl_arity (target e : expr) : tactic expr := do
 t ← infer_type e,
 get_pi_expl_arity_aux target t e
 
-meta def s_exists (v : name) : tactic unit := do
+meta def s_exists1 (v : parse ident) : tactic unit := do
 `[simp [s_exists_s_and_distr,s_and_s_exists_distr], apply s_exists_intro_pre],
 intro v, return ()
+
+meta def s_exists (vs : parse ident*) : tactic unit :=
+mmap' s_exists1 vs
+
+meta def s_intros : parse ident* → tactic unit
+ | [] := return ()
+ | (x :: xs) := do
+v ← tactic.try_core (s_exists1 x),
+match v with
+ | (some _) := s_intros xs
+ | none := extract_context (x :: xs)
+end
 
 meta def decide : tactic unit := do
 solve1 $ do
