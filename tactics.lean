@@ -27,16 +27,27 @@ meta def parse_sep_assert' : expr → tactic (dlist expr)
 meta def parse_sep_assert : expr → tactic (list expr) :=
 map dlist.to_list ∘ parse_sep_assert'
 
-meta def delete_expr (e : expr) : list expr → tactic (option (list expr))
+meta def is_mvar : expr → bool
+ | (expr.mvar _ _ _) := tt
+ | _ := ff
+
+meta def compare (unif : bool) (e₀ e₁ : expr) : tactic unit := do
+if unif then do
+guard (¬ is_mvar e₀ ∧ ¬ is_mvar e₁),
+unify e₀ e₁
+else is_def_eq e₀ e₁
+
+meta def delete_expr (unif : bool) (e : expr) : list expr → tactic (option (list expr))
  | [] := return none
  | (x :: xs) :=
-(is_def_eq e x >> return (some xs))
+(compare unif e x >> return (some xs))
 <|>
 (map (cons x) <$> delete_expr xs)
 
-meta def match_sep : list expr → list expr → tactic (list expr × list expr × list expr)
+meta def match_sep (unif : bool)
+: list expr → list expr → tactic (list expr × list expr × list expr)
  | es (x :: xs) := do
-    es' ← delete_expr x es,
+    es' ← delete_expr unif x es,
     match es' with
      | (some es') := do
        (c,l,r) ← match_sep es' xs, return (x::c,l,r)
@@ -119,7 +130,6 @@ try `[simp] >> ac_refl
 meta def match_one_term : tactic unit := do
 `[simp [s_and_assoc]]
 
-
 /-- apply on a goal of the form `sat p spec` -/
 meta def extract_context_aux (h : name) : tactic unit := do
 `[apply precondition _],
@@ -145,23 +155,17 @@ meta def match_sep_imp : expr → tactic (expr × expr)
  | _ := fail "expression is not an sep implication"
 
 meta def ac_match' : tactic unit := do
--- reflexivity
--- <|> do
+try `[apply s_imp_of_eq],
 t ← target,
-(e₀,e₁) ← (match_eq t <|> match_sep_imp t),
+(e₀,e₁) ← match_eq t,
 e₀ ← parse_sep_assert e₀,
 e₁ ← parse_sep_assert e₁,
-(c,l,r) ← match_sep e₀ e₁,
-trace "reshuffle",
-trace e₀,
-trace e₁,
-trace "result",
-trace c,
-trace l,
-trace r,
-reshuffle `(%%(mk_sep_assert c) :*: %%(mk_sep_assert l)) `(%%(mk_sep_assert c) :*: %%(mk_sep_assert r)),
-trace "after reshuffle",
-`[apply congr_arg]
+(c,l,r) ← match_sep ff e₀ e₁,
+(c',l',r') ← match_sep tt l r,
+h ← assert `h `(%%(mk_sep_assert l') = (%%(mk_sep_assert r') : hprop)),
+solve1 tactic.reflexivity,
+target >>= instantiate_mvars >>= tactic.change,
+ac_refl
 
 meta def ac_match : tactic unit := do
 ac_match'
@@ -222,11 +226,10 @@ e ← resolve_name (mk_str_name cmd.const_name "spec") >>= to_expr,
 r ← to_expr ``(sat _ _),
 e' ← get_pi_expl_arity r e,
 `[apply (bind_framing_left _ %%e')],
-solve1 (try `[simp [s_and_assoc]] >> try match_assert),
+solve1 (try `[simp [s_and_assoc]] >> try ac_match'),
 all_goals (try `[apply of_as_true, apply trivial]),
 interactive.intro v, `[simp],
-extract_context ids,
-repeat (extract_context_aux `_)
+s_intros ids
 
 meta def last_step : tactic unit := do
 g ← target,

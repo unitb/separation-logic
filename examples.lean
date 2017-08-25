@@ -44,7 +44,7 @@ fix (λ map_list p,
 if p = 0
 then return ()
 else do
-  modify p (+1),
+  modify_nth p 0 2 (+1),
   p' ← read_nth p 1 2,
   map_list p'.to_ptr)
 
@@ -52,7 +52,7 @@ lemma map_list_def (p : pointer)
 : map_list p =
   if p = 0 then return ()
   else do
-    modify p (+1),
+    modify_nth p 0 2 (+1),
     p' ← read_nth p 1 2 dec_trivial,
     map_list p'.to_ptr :=
 begin
@@ -75,31 +75,24 @@ begin
   case nil
   { unfold map is_list,
     rw ← embed_s_and_self,
-    apply context_left, simp,
-    intro Hp₀, rw [map_list_def],
-    rw if_pos Hp₀,
+    extract_context h,
+    rw embed_s_and_self,
+    rw [map_list_def],
+    rw if_pos h,
     apply return.spec' },
-  case cons x xs
+  case cons x xs map_list.spec
   { unfold map is_list,
-    apply context_left, intro Hp_nz,
+    s_intros nx Hp_nz,
     rw [map_list_def],
     rw if_neg Hp_nz, simp,
-    apply s_exists_intro_pre _,
-    intro nx,
-    apply bind_framing_right (is_list (nx.to_ptr) xs)
-                             (modify_head.spec p (+1) x [nx]),
-    { ac_refl },
-    intro x, cases x, simp,
-    apply bind_framing_right (is_list (nx.to_ptr) xs)
-                             (read_nth.spec p 1 [x+1,nx] (of_as_true trivial)),
-    { ac_refl },
-    intro r_nx, simp [nth_le,embed_eq_emp Hp_nz],
-    rw [← s_and_comm,s_and_assoc],
-    apply context_left, intro Hnx,
-    subst r_nx,
-    apply s_exists_intro_post nx,
-    apply framing_left,
-    apply ih_1, }
+    bind_step,
+    bind_step with h,
+    unfold replace nth_le at *, subst x_2,
+    apply framing_spec' _ (map_list.spec _),
+    { ac_match' },
+    { intro x, simp,
+      apply s_exists_intro, simp [embed_eq_emp Hp_nz],
+      ac_match' }, }
 end
 
 lemma lift_ite (p : Prop) [decidable p] (f g : α → β) (x : α)

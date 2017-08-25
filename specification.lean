@@ -291,7 +291,7 @@ end
 lemma framing_spec'  (q : hprop)
   (h : sat P { pre := p₁, post := r₁ })
   (Hpre : p =*> p₁ :*: q)
-  (Hpost : ∀ x, r x = r₁ x :*: q)
+  (Hpost : ∀ x, r₁ x :*: q =*> r x)
 : sat P { pre := p, post := λ x, r x } :=
 sorry
 
