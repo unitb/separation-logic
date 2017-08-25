@@ -53,7 +53,7 @@ lemma map_list_def (p : pointer)
   if p = 0 then return ()
   else do
     modify_nth p 0 2 (+1),
-    p' ← read_nth p 1 2 dec_trivial,
+    p' ← read_nth p 1 2,
     map_list p'.to_ptr :=
 begin
   unfold map_list,
@@ -61,6 +61,7 @@ begin
   admit -- rw [program.fix_unroll,dif_eq_if], refl
 end
 
+@[ptr_abstraction]
 def is_list : pointer → list word → hprop
   | p [] := [| p = 0 |]
   | p (v :: vs) := [| p ≠ 0 |] :*: ∃∃ nx : word, p ↦* [v,nx] :*: is_list nx.to_ptr vs
@@ -80,24 +81,16 @@ begin
     rw [map_list_def],
     rw if_pos h,
     apply return.spec' },
-  case cons x xs map_list.spec
+  case cons x xs
   { unfold map is_list,
     s_intros nx Hp_nz,
     rw [map_list_def],
     rw if_neg Hp_nz, simp,
     bind_step,
     bind_step with h,
-    unfold replace nth_le at *, subst x_2,
-    apply framing_spec' _ (map_list.spec _),
-    { ac_match' },
-    { intro x, simp,
-      apply s_exists_intro, simp [embed_eq_emp Hp_nz],
-      ac_match' }, }
+    unfold replace nth_le at *, subst x_1,
+    last_step (ih_1 nx.to_ptr), }
 end
-
-lemma lift_ite (p : Prop) [decidable p] (f g : α → β) (x : α)
-: (if p then f else g) x = if p then f x else g x :=
-by { by_cases p with h, simp [if_pos h], simp [if_neg h] }
 
 def list_reverse_aux : ∀ (p r : pointer),  program pointer :=
 fix2 (λ list_reverse_aux p r,
@@ -120,58 +113,39 @@ begin
   admit -- rw [program.fix2_unroll], refl
 end
 
-lemma list_reverse_aux_spec (p r : pointer) (xs ys : list word)
+lemma list_reverse_aux.spec (p r : pointer) (xs ys : list word)
 : sat (list_reverse_aux p r)
       { pre := is_list p xs :*: is_list r ys
       , post := λ r', is_list r' (reverse xs ++ ys) } :=
 begin
-  revert p r ys,
-  induction xs ; intros p r ys,
+  revert ys p r,
+  induction xs ; intros ys p r,
   case nil
   { simp [is_list],
-    apply context_left,
-    intro h,
+    extract_context h,
     rw [list_reverse_aux_def,if_pos h],
-    apply postcondition _ (return.spec r _),
-    intro, simp, },
+    last_step, },
   case cons x xs
   { simp [is_list],
-    rw [s_and_assoc],
-    apply context_left,
-    intro h,
-    rw [list_reverse_aux_def,if_neg h,s_exists_s_and_distr],
-    apply s_exists_intro_pre, intro nx,
-    apply bind_framing_left _ (read_nth.spec p 1 [x,nx] (of_as_true trivial)),
-    { rw s_and_assoc },
-    intro r, simp [nth_le,s_and_assoc],
-    apply context_left,
-    intro, subst r,
-    apply bind_framing_left _ (write_nth.spec p _ 1 [x,nx] _),
-    { refl },
-    intro x, cases x, simp [replace,const],
-    have h : is_list r ys = is_list ( word.to_word r ).to_ptr ys, { simp },
-    rw h, clear h,
-    generalize : (word.to_word r) = k,
-    apply s_exists_elim_pre k,
-    apply precondition (is_list nx.to_ptr xs :*: is_list p (x :: ys)),
-    apply ih_1 nx.to_ptr p (x :: ys),
-    { simp [is_list,embed_eq_emp h],
-      rw [s_and_s_exists_distr],
-      apply s_exists_congr,
-      intro, ac_refl } }
+    s_intros nx h,
+    rw [list_reverse_aux_def,if_neg h],
+    bind_step p' with h',
+    unfold nth_le at h', subst p',
+    bind_step, unfold replace const,
+    last_step (ih_1 (x :: ys)), }
 end
 
 def list_reverse (p : pointer) : program pointer :=
 list_reverse_aux p 0
 
-lemma list_reverse_spec (p : pointer) (xs : list word)
+lemma list_reverse.spec (p : pointer) (xs : list word)
 : sat (list_reverse p)
       { pre := is_list p xs
       , post := λ r, is_list r (reverse xs) } :=
 begin
   unfold list_reverse,
   apply precondition (is_list p xs :*: is_list 0 []),
-  apply postcondition _ (list_reverse_aux_spec p 0 xs []),
+  apply postcondition _ (list_reverse_aux.spec p 0 xs []),
   { intros, simp },
   { simp [is_list,embed_eq_emp], }
 end

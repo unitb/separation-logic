@@ -133,6 +133,12 @@ lemma s_exists_intro  {α : Type u}
 : p =*> ∃∃ x, q x :=
 sorry
 
+lemma s_exists_elim  {α : Type u}
+  {p : α → hprop} {q : hprop} (x : α)
+  (h : ∀ x, p x =*> q)
+: (∃∃ x, p x) =*> q :=
+sorry
+
 lemma s_imp_of_eq {p q : hprop}
   (h : p = q)
 : p =*> q :=
