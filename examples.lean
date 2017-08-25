@@ -48,7 +48,7 @@ end
 
 open program
 
-def map_list : pointer → program unit := by apply
+def map_list : pointer → program unit :=
 fix (λ map_list p,
 if p = 0
 then return ()
@@ -115,7 +115,7 @@ lemma lift_ite (p : Prop) [decidable p] (f g : α → β) (x : α)
 : (if p then f else g) x = if p then f x else g x :=
 by { by_cases p with h, simp [if_pos h], simp [if_neg h] }
 
-def list_reverse_aux : ∀ (p r : pointer),  program pointer := by apply
+def list_reverse_aux : ∀ (p r : pointer),  program pointer :=
 fix2 (λ list_reverse_aux p r,
 if p = 0 then return r
 else do
@@ -200,7 +200,7 @@ lemma list_reverse_spec' (p : pointer) (vs : list word)
                          post := λ q, is_list q (list.reverse vs) } :=
 sorry
 
-def list_reverse_dup_aux : pointer → pointer → program pointer := by apply
+def list_reverse_dup_aux : pointer → pointer → program pointer :=
 fix2 (λ list_reverse_dup_aux p q,
 if p = 0 then return q
 else do

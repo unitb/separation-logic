@@ -26,7 +26,7 @@ namespace program
 
 variables {α : Type u} {β : Type}
 
-section fix
+section mfix
 
 protected def le (x y : program β) : Prop :=
 ∀ i, x i ≤ y i
@@ -79,7 +79,7 @@ begin
     apply h' }
 end
 
-protected def fix {α : Type} {β : Type}
+protected def mfix {α : Type} {β : Type}
   (f : (α → program β) → α → program β)
   (Hf : monotonic f)
 : α → program β :=
@@ -91,16 +91,16 @@ curry (@nonterm.fix (α × hstate) (β × hstate) (λ g, uncurry' (f $ curry g))
 --   (f : (α → γ → program β) → α → γ → program β) :=
 -- monotonic (λ rec, uncurry' (f $ curry rec))
 
-def program.fix2 {α : Type} {α' : Type} {β : Type}
+protected def program.mfix2 {α : Type} {α' : Type} {β : Type}
   (f : (α → α' → program β) → α → α' → program β)
   (Hf : monotonic2 f)
 : α → α' → program β :=
-curry $ program.fix (λ g, uncurry' (f $ curry g)) Hf
+curry $ program.mfix (λ g, uncurry' (f $ curry g)) Hf
 
 def program.fix_unroll {α : Type} {β : Type}
   (f : (α → program β) → α → program β)
   (Hf : monotonic f)
-: program.fix f Hf = f (program.fix f Hf) :=
+: program.mfix f Hf = f (program.mfix f Hf) :=
 begin
   admit
 end
@@ -108,12 +108,12 @@ end
 def program.fix2_unroll {α : Type} {α' : Type} {β : Type}
   (f : (α → α' → program β) → α → α' → program β)
   (Hf : monotonic2 f)
-: program.fix2 f Hf = f (program.fix2 f Hf) :=
+: program.mfix2 f Hf = f (program.mfix2 f Hf) :=
 begin
   admit
 end
 
-end fix
+end mfix
 
 end program
 
@@ -145,7 +145,7 @@ variable Hg : ∀ y, monotonic (λ rec x, g rec x y)
 include Hf
 
 protected lemma pre_fixpoint (x : α)
-: program.fix f Hf x ≤ f (program.fix f Hf) x :=
+: program.mfix f Hf x ≤ f (program.mfix f Hf) x :=
 sorry
 
 include Hg
@@ -160,7 +160,7 @@ end program
 
 instance has_fix_program : has_fix program :=
  { to_has_mono := by apply_instance
- , mfix := λ α β f h, @program.fix α β _ h
+ , mfix := λ α β f h, @program.mfix α β _ h
  , bind_monotonic := by { introv h₀ h₁, apply program.bind_monotonic _ _ h₀ h₁, }
  , bind_monotonic' := @program.bind_monotonic'
  , pre_fixpoint := by { introv, apply program.pre_fixpoint } }
