@@ -4,9 +4,16 @@ import ..separation.specification
 
 universes u v
 
-section tactics
+namespace tactic.interactive
 
+open applicative
+open lean.parser
+open interactive
+open interactive.types
 open tactic has_map list nat separation
+
+local postfix `?`:9001 := optional
+local postfix *:9001 := many
 
 meta def mk_sep_assert : list expr → expr
  | [] := `(emp)
@@ -66,7 +73,7 @@ h₁ ← to_expr ``(%%t₁ = %%e₁) >>= assert `h₁,
 solve1 admit,
 `[rw h₀],
 `[rw h₁],
-clear h₀, clear h₁
+tactic.clear h₀, tactic.clear h₁
 
 meta def find_match (pat : expr) : expr → list expr → tactic expr
  | e rest := do
@@ -106,7 +113,7 @@ meta def match_assert : tactic unit := do
 (hp,pat,var) ← sep_goal,
 e ← find_match pat hp [],
 unify e var,
-target >>= instantiate_mvars >>= change,
+tactic.target >>= instantiate_mvars >>= tactic.change,
 try `[simp] >> ac_refl
 
 meta def match_one_term : tactic unit := do
@@ -124,12 +131,12 @@ solve1 (do
   to_expr ``( [| _ |] ) >>= unify pat,
   e ← find_match pat hp [],
   unify e var,
-  target >>= instantiate_mvars >>= change,
+  tactic.target >>= instantiate_mvars >>= tactic.change,
   ac_refl),
 `[apply context_left],
 intro h, return ()
 
-meta def extract_context : list name → tactic unit
+meta def extract_context : parse ident* → tactic unit
  | [] := return ()
  | (h :: hs) := extract_context_aux h >> extract_context hs
 
@@ -158,8 +165,6 @@ trace "after reshuffle",
 
 meta def ac_match : tactic unit := do
 ac_match'
-
-open applicative
 
 def replicate {m : Type u → Type v} [monad m] {α} : ℕ → m α → m (list α)
  | 0 _ := return []
@@ -196,7 +201,7 @@ solve1 $ do
  `[apply of_as_true],
  triv
 
-meta def bind_step (v : name) : tactic unit := do
+meta def bind_step (v : parse ident_? ) (ids : parse with_ident_list) : tactic unit := do
 g ← target,
 (hd,tl,spec) ← (match_expr 3 (λ e₀ e₁ s, ``(sat (%%e₀ >>= %%e₁) %%s)) g
              : tactic (expr × expr × expr)),
@@ -207,7 +212,9 @@ e' ← get_pi_expl_arity r e,
 `[apply (bind_framing_left _ %%e')],
 solve1 (try `[simp [s_and_assoc]] >> try match_assert),
 all_goals (try `[apply of_as_true, apply trivial]),
-intro v, `[simp]
+interactive.intro v, `[simp],
+extract_context ids,
+repeat (extract_context_aux `_)
 
 meta def last_step : tactic unit := do
 g ← target,
@@ -222,4 +229,4 @@ solve1 (try `[simp [s_and_assoc]] >> try match_assert),
 solve1 (try `[simp [s_and_assoc]] >> try match_assert),
 all_goals (try `[apply of_as_true, apply trivial])
 
-end tactics
+end tactic.interactive

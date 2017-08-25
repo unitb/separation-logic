@@ -30,11 +30,10 @@ lemma swap_ptr_spec (p q : pointer) (v₀ v₁ : word)
                      , post := λ _, p ↦ v₁ :*: q ↦ v₀ } :=
 begin
   unfold swap_ptr,
-  bind_step `t,
-  extract_context [`h],
-  bind_step `u,
-  bind_step `u,
-  bind_step `u,
+  bind_step t with h,
+  bind_step,
+  bind_step,
+  bind_step,
   last_step,
 end
 
