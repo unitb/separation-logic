@@ -32,18 +32,10 @@ begin
   unfold swap_ptr,
   bind_step `t,
   extract_context [`h],
-  apply bind_framing_right (q ↦ v₁) (copy.spec t p 0 v₀),
-  { ac_refl },
-  intro x, cases x, simp,
-  apply bind_framing_right (t ↦ v₀) (copy.spec p q v₀ v₁),
-  { ac_refl },
-  intro x, cases x, simp,
-  apply bind_framing_right (p ↦ v₁) (copy.spec q t v₁ v₀),
-  { ac_refl },
-  intro x, cases x, simp, rw ← s_and_assoc,
-  apply framing_spec (p ↦ v₁ :*: q ↦ v₀)  (free1.spec t v₀),
-  { ac_refl },
-  { intro x, cases x, simp },
+  bind_step `u,
+  bind_step `u,
+  bind_step `u,
+  last_step,
 end
 
 open program

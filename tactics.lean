@@ -107,8 +107,6 @@ meta def match_assert : tactic unit := do
 e ← find_match pat hp [],
 unify e var,
 target >>= instantiate_mvars >>= change,
-trace "match_assert",
-target >>= trace,
 try `[simp] >> ac_refl
 
 meta def match_one_term : tactic unit := do
@@ -203,23 +201,25 @@ g ← target,
 (hd,tl,spec) ← (match_expr 3 (λ e₀ e₁ s, ``(sat (%%e₀ >>= %%e₁) %%s)) g
              : tactic (expr × expr × expr)),
 let (cmd,args) := hd.get_app_fn_args,
--- check the `fn` in `hd` to invoke `fn_spec`
 e ← resolve_name (mk_str_name cmd.const_name "spec") >>= to_expr,
 r ← to_expr ``(sat _ _),
 e' ← get_pi_expl_arity r e,
-trace e',
--- vs ← replicate n.length mk_mvar,
--- let e' := expr.mk_app e vs,
---  infer_type e',
-  rule ← to_expr ``(bind_framing_left _ %%e'),
-  -- infer_type rule,
--- `[apply %%rule],
-  type_check rule,
-  apply rule,
-  target >>= trace,
-  solve1 (try `[simp] >> try match_assert),
-  all_goals (try `[apply of_as_true, apply trivial]),
-  intro v, `[simp],
-  trace_state
+`[apply (bind_framing_left _ %%e')],
+solve1 (try `[simp [s_and_assoc]] >> try match_assert),
+all_goals (try `[apply of_as_true, apply trivial]),
+intro v, `[simp]
+
+meta def last_step : tactic unit := do
+g ← target,
+(hd,spec) ← (match_expr 2 (λ e s, ``(sat %%e %%s)) g
+             : tactic (expr × expr)),
+let (cmd,args) := hd.get_app_fn_args,
+e ← resolve_name (mk_str_name cmd.const_name "spec") >>= to_expr,
+r ← to_expr ``(sat _ _),
+e' ← get_pi_expl_arity r e,
+`[apply (framing_spec _ %%e')],
+solve1 (try `[simp [s_and_assoc]] >> try match_assert),
+solve1 (try `[simp [s_and_assoc]] >> try match_assert),
+all_goals (try `[apply of_as_true, apply trivial])
 
 end tactics
