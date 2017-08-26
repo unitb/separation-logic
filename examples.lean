@@ -1,5 +1,7 @@
 import data.bitvec
 import data.dlist
+import data.list.basic
+
 import util.logic
 import util.control.applicative
 import util.control.monad.non_termination
@@ -130,7 +132,7 @@ begin
     s_intros nx h,
     rw [list_reverse_aux_def,if_neg h],
     bind_step p' with h',
-    unfold nth_le at h', subst p',
+    subst p',
     bind_step, unfold replace const,
     last_step (ih_1 (x :: ys)), }
 end
@@ -205,7 +207,7 @@ begin
     rw [list_reverse_dup_aux_def,if_pos h],
     subst q, simp [segment_nil],
     apply postcondition _ (return.spec _ _),
-    { intros, ac_refl } },
+    { intros, dsimp [list.reverse_nil], ac_refl } },
   case cons y ys
   { unfold is_list,
     extract_context h,
@@ -214,7 +216,6 @@ begin
     bind_step ry with h₀,
     bind_step q' with h₁,
     bind_step p' with h₂,
-    unfold nth_le at *,
     subst ry, subst p',
     -- apply s_exists_elim_pre nx,
     -- apply s_exists_replace_pre word.to_word word.to_ptr,

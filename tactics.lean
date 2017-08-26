@@ -16,7 +16,7 @@ local postfix `?`:9001 := optional
 local postfix *:9001 := many
 
 @[user_attribute]
-def ptr_abstraction : user_attribute :=
+meta def ptr_abstraction : user_attribute :=
 { name  := `ptr_abstraction
 , descr := "Abstraction predicate for pointer structures" }
 
@@ -179,7 +179,7 @@ else return ()
 
 meta def ac_match' : tactic unit := do
 abs ← attribute.get_instances `ptr_abstraction,
-try (unfold abs (loc.ns [])),
+try (unfold abs (loc.ns [none])),
 try `[simp [s_and_s_exists_distr,s_exists_s_and_distr] { fail_if_unchanged := ff }],
 repeat `[apply s_exists_elim, intro_unit],
 repeat `[apply s_exists_intro],

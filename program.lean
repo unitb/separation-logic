@@ -50,7 +50,7 @@ protected def le_trans (x y z : program β)
 : x ≤ z :=
 by { intro i, apply le_trans (h₀ i) (h₁ i) }
 
-instance : weak_order (program β) :=
+instance : partial_order (program β) :=
  { le := program.le
  , le_refl := @program.le_refl β
  , le_antisymm := program.le_antisymm
