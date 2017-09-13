@@ -3,8 +3,8 @@ import data.dlist
 import util.logic
 import util.control.applicative
 import util.control.monad.non_termination
-import ..separation.heap
-import ..separation.program
+import separation.heap
+import separation.program
 
 universes u v w w'
 
@@ -96,18 +96,9 @@ lemma embed_s_and_embed (p q : Prop)
 : [| p |] :*: [| q |] = [| p ∧ q |] :=
 begin
   unfold embed emp s_and, apply congr_arg,
-  apply funext, intro, simp,
+  apply funext, intro, simp [-and_comm],
   apply iff.to_eq,
-  split ; intro h,
-  { cases h with hp₀ h, cases h with hp₁ h, cases h with d h,
-    cases h with h₀ h, cases h with h₁ h,
-    repeat { split, assumption },
-    cases h with ha hb, cases hb with hb hc,
-    simp [hc,ha,hb], },
-  { existsi heap.emp, existsi heap.emp, existsi heap_emp_disjoint _,
-    cases h with h₀ h₁, cases h₁ with h₁ h₂,
-    simp,
-    repeat { try { split }, assumption } }
+  simp [heap_emp_disjoint],
 end
 
 @[simp]
@@ -220,6 +211,12 @@ lemma precondition (p : hprop)
  (Hside : p = q)
 : sat P { pre := q, post := r } :=
 by { subst q, apply Hspec }
+
+lemma precondition' (p : hprop)
+ (Hspec : sat P { pre := p, post := r })
+ (Hside : q =*> p)
+: sat P { pre := q, post := r } :=
+sorry
 
 lemma bind_framing_left (p₁ : hprop)
   (H₀ : sat P { pre := p₀, post := r })
@@ -414,13 +411,18 @@ begin
   apply h
 end
 
-lemma free.spec (p : pointer) (vs : list word)
-: sat (free p vs.length) { pre := p ↦* vs, post := λ r, emp } :=
+lemma free.spec (p : pointer) (n : ℕ) (vs : list word)
+  (h : n = length vs)
+: sat (free p n) { pre := p ↦* vs, post := λ r, emp } :=
 sorry
 
 lemma free1.spec (p : pointer) (v : word)
 : sat (free1 p) { pre := p ↦ v, post := λ r, emp } :=
-sorry
+begin
+  have h := free.spec p 1 [v] rfl,
+  simp [points_to_multiple] at h,
+  apply h,
+end
 
 lemma copy.spec (p q : pointer) (v₀ v₁ : word)
 : sat (copy p q) { pre := p ↦ v₀ :*: q ↦ v₁

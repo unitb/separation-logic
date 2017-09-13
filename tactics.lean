@@ -1,6 +1,6 @@
 
 import data.dlist
-import ..separation.specification
+import separation.specification
 
 universes u v
 
@@ -140,11 +140,8 @@ unify e var,
 tactic.target >>= instantiate_mvars >>= tactic.change,
 try `[simp] >> ac_refl
 
--- meta def match_one_term : tactic unit := do
--- `[simp [s_and_assoc]]
-
 /-- apply on a goal of the form `sat p spec` -/
-meta def extract_context_aux (h : name) : tactic unit := do
+meta def extract_context_aux (h : name) (subst_flag : bool) : tactic unit := do
 `[apply precondition _],
 swap,
 `[symmetry],
@@ -155,13 +152,18 @@ solve1 (do
   e ← find_match pat hp [],
   unify e var,
   tactic.target >>= instantiate_mvars >>= tactic.change,
-  ac_refl),
+  try `[simp],
+  try ac_refl),
 `[apply context_left],
-intro h, return ()
+x ← tactic.intro h,
+when subst_flag $ try (tactic.subst x),
+return ()
 
-meta def extract_context : parse ident* → tactic unit
- | [] := return ()
- | (h :: hs) := extract_context_aux h >> extract_context hs
+meta def subst_flag := (tk "with" *> tk "subst" *> pure tt) <|> return ff
+
+meta def extract_context : parse ident* → ∀ (x : parse subst_flag), tactic unit
+ | [] x := return ()
+ | (h :: hs) x := extract_context_aux h x >> extract_context hs x
 
 meta def match_sep_imp : expr → tactic (expr × expr)
  | `(%%e₀ =*> %%e₁) := return (e₀, e₁)
@@ -178,11 +180,15 @@ then tactic.cases e
 else return ()
 
 meta def ac_match' : tactic unit := do
-abs ← attribute.get_instances `ptr_abstraction,
-try (unfold abs (loc.ns [none])),
+abs ← attribute.get_instances `ptr_abstraction >>= mmap (map simp_arg_type.expr ∘ resolve_name),
+-- try (unfold abs (loc.ns [none])),
+-- try (simp tt [] [`separation.example.ptr_abstraction] (loc.ns [])),
+try (simp tt abs [] (loc.ns [none])),
 try `[simp [s_and_s_exists_distr,s_exists_s_and_distr] { fail_if_unchanged := ff }],
 repeat `[apply s_exists_elim, intro_unit],
 repeat `[apply s_exists_intro],
+trace "\nrewrite\n",
+trace_state,
 try (unfold_projs (loc.ns [])),
 done <|> focus1 (do
   repeat `[rw [embed_eq_emp],
@@ -238,19 +244,20 @@ t ← infer_type e,
 get_pi_expl_arity_aux target t e
 
 meta def s_exists1 (v : parse ident) : tactic unit := do
-`[simp [s_exists_s_and_distr,s_and_s_exists_distr], apply s_exists_intro_pre],
+`[ simp [s_exists_s_and_distr,s_and_s_exists_distr] { fail_if_unchanged := ff }
+ , apply s_exists_intro_pre],
 intro v, return ()
 
 meta def s_exists (vs : parse ident*) : tactic unit :=
 mmap' s_exists1 vs
 
-meta def s_intros : parse ident* → tactic unit
- | [] := return ()
- | (x :: xs) := do
+meta def s_intros : parse ident* → parse subst_flag → tactic unit
+ | [] _ := return ()
+ | (x :: xs) sbst := do
 v ← tactic.try_core (s_exists1 x),
 match v with
- | (some _) := s_intros xs
- | none := extract_context (x :: xs)
+ | (some _) := s_intros xs sbst
+ | none := extract_context (x :: xs) sbst
 end
 
 meta def decide : tactic unit := do
@@ -258,19 +265,24 @@ solve1 $ do
  `[apply of_as_true],
  triv
 
-meta def bind_step (v : parse ident_? ) (ids : parse with_ident_list) : tactic unit := do
+meta def bind_step (spec_thm : parse texpr? ) (ids : parse with_ident_list) : tactic unit := do
 g ← target,
 (hd,tl,spec) ← (match_expr 3 (λ e₀ e₁ s, ``(sat (%%e₀ >>= %%e₁) %%s)) g
              : tactic (expr × expr × expr)),
 let (cmd,args) := hd.get_app_fn_args,
-e ← resolve_name (mk_str_name cmd.const_name "spec") >>= to_expr,
+let s : option _ := spec_thm,
+e ← (resolve_name (cmd.const_name <.> "spec") >>= to_expr) <| (to_expr <$> s),
 r ← to_expr ``(sat _ _),
 e' ← get_pi_expl_arity r e,
 `[apply (bind_framing_left _ %%e')],
 solve1 (try `[simp [s_and_assoc]] >> try ac_match'),
 all_goals (try `[apply of_as_true, apply trivial]),
+(v,ids) ← return $ match ids with
+               | [] := (none,[])
+               | (id :: ids) := (some id, ids)
+              end,
 intro_unit v, `[simp],
-s_intros ids
+s_intros ids tt
 
 open option
 

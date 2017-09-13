@@ -45,7 +45,7 @@ lemma heap_emp_part_eq_self (h : heap)
 begin
   apply funext, intro,
   unfold part',
-  cases (h x) ; simp [heap.emp,has_orelse.orelse,option_orelse]
+  cases (h x) ; simp [heap.emp,has_orelse.orelse,option.orelse]
 end
 
 def heap.mk : pointer → list word → heap
