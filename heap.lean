@@ -3,6 +3,8 @@ import data.dlist
 import util.logic
 import util.control.applicative
 import util.control.monad.non_termination
+import util.data.option
+import util.meta.tactic
 
 universes u v w w'
 
@@ -25,7 +27,7 @@ def disjoint (h₀ h₁ : heap) :=
 
 infix ` ## `:51 := disjoint
 
-def part'  (h₀ h₁ : heap) (_ : h₀ ## h₁) : heap
+def part'  (h₀ h₁ : heap) (_ : h₀ ## h₁ . tactic.assumption) : heap
  | p := h₀ p <|> h₁ p
 
 def maplet (p : pointer) (v : word) : heap
@@ -68,43 +70,101 @@ section noncomp
 local attribute [instance] classical.prop_decidable
 
 noncomputable def part (h₀ h₁ : heap) : option heap :=
-if Hd : disjoint h₀ h₁
-then some (part' h₀ h₁ Hd)
+if Hd : h₀ ## h₁
+then some (part' h₀ h₁)
 else none
 
 end noncomp
 
-lemma part_comm (h₀ h₁ : heap)
-: part h₀ h₁ = part h₁ h₀ :=
-sorry
-
 lemma disjoint_symm {h₀ h₁ : heap}
   (h : h₀ ## h₁)
 : h₁ ## h₀ :=
-sorry
+assume p, or.symm (h p)
 
 lemma part_comm' {h₀ h₁ : heap}
   (h : h₀ ## h₁)
-: part' h₀ h₁ h = part' h₁ h₀ (disjoint_symm h) :=
-sorry
+: part' h₀ h₁ = part' h₁ h₀ (disjoint_symm h) :=
+begin
+  funext p, unfold part',
+  cases h p with h h ; simp [h],
+end
 
-lemma part'_part_assoc {h₀ h₁ h₂ : heap}
-  (Hdisj : disjoint h₀ h₁)
-  (Hdisj' : disjoint h₁ h₂)
-: part (part' h₀ h₁ Hdisj) h₂ = part h₀ (part' h₁ h₂ Hdisj') := sorry
+lemma part_comm (h₀ h₁ : heap)
+: part h₀ h₁ = part h₁ h₀ :=
+begin
+  unfold part,
+  cases classical.em (h₀ ## h₁) with H H,
+  { have H' := disjoint_symm H,
+    simp [dif_pos,H,H',part_comm' H] },
+  { have H' := mt disjoint_symm H,
+    simp [dif_neg,H,H'] }
+end
 
 lemma disjoint_of_part {h h₀ h₁ : heap}
   (HH : some h = part h₀ h₁)
 : h₀ ## h₁ :=
-sorry
+begin
+  unfold part at HH,
+  apply classical.by_contradiction _,
+  intro H,
+  rw [dif_neg] at HH,
+  { contradiction },
+  { assumption }
+end
+
+lemma part_disjoint_assoc {h₀ h₁ h₂ : heap}
+  (Hdisj : h₀ ## h₁)
+  (Hdisj' : h₁ ## h₂)
+  (h : part' h₀ h₁ Hdisj ## h₂)
+: h₀ ## part' h₁ h₂ Hdisj' :=
+begin
+  intro p,
+  cases h p with h' h' ; unfold part' at *,
+  { rw or_else_eq_none_iff at h',
+    simp [h'.left] },
+  { simp [h',Hdisj p], },
+end
+
+lemma part'_part_assoc {h₀ h₁ h₂ : heap}
+  (Hdisj : disjoint h₀ h₁)
+  (Hdisj' : disjoint h₁ h₂)
+: part (part' h₀ h₁) h₂ = part h₀ (part' h₁ h₂) :=
+begin
+  unfold part,
+  cases classical.em (part' h₀ h₁ Hdisj ## h₂) with h h,
+  { have h' : (h₀ ## part' h₁ h₂ Hdisj') := part_disjoint_assoc _ _ h,
+    simp [dif_pos,h,h'],
+    apply congr_arg,
+    funext p, simp [part',or_else_assoc], },
+  { have h' : ¬ (h₀ ## part' h₁ h₂ Hdisj'),
+    { rw part_comm',
+      apply mt disjoint_symm,
+      apply mt (part_disjoint_assoc _ _),
+      apply mt disjoint_symm,
+      rw part_comm',
+      apply h,
+      apply disjoint_symm Hdisj },
+    simp [dif_neg,h,h'] }
+end
 
 lemma part'_of_part {h h₀ h₁ : heap}
   (H : some h = part h₀ h₁)
 : h = part' h₀ h₁ (disjoint_of_part H) :=
-sorry
+begin
+  unfold part at H, dedup,
+  simp [dif_pos,disjoint_of_part H] at H_1,
+  injection H_1,
+end
 
 lemma disjoint_disjoint {h₁ h₂ h₃ : heap}
   (H₁ : h₂ ## h₃)
   (H₀ : part' h₂ h₃ H₁ ## h₁)
 : h₁ ## h₃ :=
-sorry
+begin
+  intro p,
+  cases H₀ p with H₂ H₂,
+  { unfold part' at H₂,
+    rw or_else_eq_none_iff at H₂,
+    simp [H₂.right] },
+  { simp [H₂] }
+end
