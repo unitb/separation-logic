@@ -4,7 +4,7 @@ import data.dlist
 import util.logic
 import util.control.applicative
 import util.control.monad.non_termination
-import ..separation.heap
+import separation.heap
 
 universes u v w w'
 
