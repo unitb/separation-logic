@@ -6,6 +6,8 @@ import util.control.monad.non_termination
 import separation.heap
 import separation.program
 
+import logic.basic
+
 universes u v w w'
 
 open nat list function
@@ -21,7 +23,7 @@ def embed (p : Prop) : hprop :=
 notation `[| `p` |]` := embed p
 
 def s_and (p q : hprop) : hprop :=
-⟨ λ h, ∃ h₀ h₁ d, h = part' h₀ h₁ d ∧ p.apply h₀ ∧ q.apply h₁ ⟩
+⟨ λ h, ∃ hp₀ hp₁ d, h = part' hp₀ hp₁ d ∧ p.apply hp₀ ∧ q.apply hp₁ ⟩
 
 infix ` :*: `:55 := s_and
 
@@ -29,14 +31,46 @@ def emp : hprop :=
 ⟨ λ h, h = heap.emp ⟩
 
 @[simp]
+protected lemma apply_emp (hp : heap)
+: emp.apply hp ↔ hp = heap.emp :=
+by refl
+
+lemma exists_congr_elim {α : Sort u} {p : α → Prop} {q : Prop} (x : α)
+  (h : ∀ y, p y ↔ y = x ∧ q)
+: (∃ y, p y) ↔ q :=
+by simp [h]
+
+@[simp]
 lemma s_and_emp (p : hprop)
 : p :*: emp = p :=
-sorry
+by { cases p, simp [s_and] }
+
+lemma s_and_comm (p q : hprop)
+: p :*: q = q :*: p :=
+begin
+  cases p, cases q, simp [s_and],
+  congr, funext ihp,
+  apply iff.to_eq,
+  split ; simp,
+  { intros,
+    rw part_comm' at *,
+    existsi [x_1 , x],
+    split, assumption,
+    split, assumption,
+    split, assumption },
+  { intros,
+    rw part_comm' at *,
+    existsi [x_1],
+    split, assumption,
+    existsi [x],
+    split, assumption,
+    split, assumption }
+end
 
 @[simp]
 lemma emp_s_and (p : hprop)
 : emp :*: p = p :=
-sorry
+by rw [s_and_comm,s_and_emp]
 
 def points_to (p : ℕ) (val : word) : hprop :=
 ⟨ λ h, h = maplet p val ⟩
@@ -54,24 +88,43 @@ structure spec (r : Type u) :=
   (post : r → hprop)
 
 def sat {α} (p : program α) (s : spec α) : Prop :=
-∀ (σ : hstate) h₀ h₁,
-   some σ.heap = part h₀ h₁ →
-   s.pre.apply h₀ →
-(∃ r σ' h', p σ ~> (r, σ') ∧
-            some σ'.heap = part h₁ h' ∧
-            (s.post r).apply h')
+∀ (σ : hstate) hp₀ hp₁,
+   some σ.heap = part hp₀ hp₁ →
+   s.pre.apply hp₀ →
+(∃ r σ' hp', p σ ~> (r, σ') ∧
+            some σ'.heap = part hp' hp₁ ∧
+            (s.post r).apply hp')
 
-lemma s_and_part {h₀ h₁ : heap} {p₀ p₁ : hprop}
-  (h : h₀ ## h₁)
-  (Hp₀ : p₀.apply h₀)
-  (Hp₁ : p₁.apply h₁)
-: (p₀ :*: p₁).apply (part' h₀ h₁ h) :=
-sorry
+lemma s_and_part {hp₀ hp₁ : heap} {p₀ p₁ : hprop}
+  (h : hp₀ ## hp₁)
+  (Hp₀ : p₀.apply hp₀)
+  (Hp₁ : p₁.apply hp₁)
+: (p₀ :*: p₁).apply (part' hp₀ hp₁) :=
+begin
+  cases p₀, cases p₁, simp [s_and],
+  split, split, assumption,
+  split, split, assumption,
+  split, refl,
+end
 
 lemma embed_eq_emp {p : Prop}
   (hp : p)
 : [| p |] = emp :=
 by simp [embed,emp,eq_true_intro hp]
+
+@[simp]
+lemma embed_s_and_apply {p : Prop} {q : hprop}
+  (hp : heap)
+: ([| p |] :*: q).apply hp ↔ p ∧ q.apply hp :=
+begin
+ simp [s_and,embed],
+ apply and_congr_right,
+ intro, split,
+ { simp, intros, subst x, subst hp, simp [a_1], },
+ { intros h,
+   existsi [heap.emp,hp,h,rfl,heap_emp_disjoint _],
+   simp, }
+end
 
 def hexists {α : Type u} (p : α → hprop) : hprop :=
 ⟨ λ ptr, ∃ i, (p i).apply ptr ⟩
@@ -83,11 +136,51 @@ def h_imp (p q : hprop) : Prop :=
 
 infix ` =*> `:41 := h_imp
 
-lemma s_and_comm (p q : hprop)
-: p :*: q = q :*: p := sorry
-
 lemma s_and_assoc (p q r : hprop)
-: (p :*: q) :*: r = p :*: (q :*: r) := sorry
+: (p :*: q) :*: r = p :*: (q :*: r) :=
+begin
+  cases p with p, cases q with q, cases r with r,
+  simp [s_and],
+  congr, funext hp,
+  apply iff.to_eq,
+  split ; simp,
+  { intros hp_pq hp_r Hr Hd_pqr,
+    simp, intros H_pqr hp_p Hp hp_q Hq Hd_pq H_pq,
+    existsi hp_p,
+    split, assumption,
+    have Hd_qr : hp_q ## hp_r,
+    { apply disjoint_symm,
+      apply disjoint_disjoint_left,
+      rw ← H_pq,
+      apply Hd_pqr },
+    let hp_qr := part' hp_q hp_r,
+    existsi hp_qr,
+    split, split,
+    rw [← part'_part'_assoc],
+    apply eq.mp _ H_pqr, congr, assumption,
+    rw ← H_pq, assumption,
+    existsi hp_q, split, assumption,
+    existsi hp_r, split, assumption,
+    split, refl,
+    unfold_local hp_qr, apply part_disjoint_assoc_left,
+    rw ← H_pq, assumption, },
+  { intros hp_p Hp hp_qr Hd_pqr,
+    simp, intros H_pqr hp_q Hp hp_r Hq Hd_qr H_qr,
+    have Hd_pq : hp_p ## hp_q,
+    { apply disjoint_disjoint_right,
+      rw ← H_qr,
+      apply disjoint_symm Hd_pqr, },
+    let hp_pq := part' hp_p hp_q,
+    existsi hp_pq,
+    existsi hp_r, split, assumption,
+    split, split, rw [H_pqr,part'_part'_assoc],
+    congr, assumption, rw ← H_qr, assumption,
+    existsi hp_p, split, assumption,
+    existsi hp_q, split, assumption,
+    existsi Hd_pq, refl,
+    apply part_disjoint_assoc_right,
+    rw ← H_qr, assumption },
+end
 
 instance : is_associative hprop s_and := ⟨ s_and_assoc ⟩
 instance : is_commutative hprop s_and := ⟨ s_and_comm ⟩
@@ -97,8 +190,6 @@ lemma embed_s_and_embed (p q : Prop)
 begin
   unfold embed emp s_and, apply congr_arg,
   apply funext, intro, simp [-and_comm],
-  apply iff.to_eq,
-  simp [heap_emp_disjoint],
 end
 
 @[simp]
@@ -122,35 +213,67 @@ lemma s_exists_intro  {α : Type u}
   {p : hprop} {q : α → hprop} (x : α)
   (h : p =*> q x)
 : p =*> ∃∃ x, q x :=
-sorry
+begin
+  unfold h_imp hexists at *,
+  intros hp h',
+  specialize h hp h',
+  existsi x, assumption,
+end
 
 lemma s_exists_elim  {α : Type u}
   {p : α → hprop} {q : hprop} (x : α)
   (h : ∀ x, p x =*> q)
 : (∃∃ x, p x) =*> q :=
-sorry
+begin
+  simp [h_imp,hexists] at *,
+  intros hp x, apply h,
+end
 
 lemma s_imp_of_eq {p q : hprop}
   (h : p = q)
 : p =*> q :=
-sorry
-
-lemma s_exists_s_and_distr {α : Type u}
-  (p : α → hprop) (q : hprop)
-: (∃∃ x, p x) :*: q = (∃∃ x, p x :*: q) :=
-sorry
-
-lemma s_and_s_exists_distr {α : Type u}
-  (p : α → hprop) (q : hprop)
-: q :*: (∃∃ x, p x) = (∃∃ x, q :*: p x) :=
-sorry
+begin
+  unfold h_imp,
+  rw h,
+  intros, assumption
+end
 
 @[congr]
 lemma s_exists_congr {α : Type u}
   {p q : α → hprop}
   (h : ∀ x, p x = q x)
 : hexists p = hexists q :=
-sorry
+begin
+  unfold hexists,
+  congr,
+  simp [h],
+end
+
+lemma s_exists_s_and_distr {α : Type u}
+  (p : α → hprop) (q : hprop)
+: (∃∃ x, p x) :*: q = (∃∃ x, p x :*: q) :=
+begin
+  simp [s_and,hexists],
+  congr, funext hp,
+  apply iff.to_eq,
+  split ; simp ; intros,
+  { split, split, split,
+    existsi a,
+    existsi a_1,
+    split, assumption },
+  { split, split,
+    existsi a,
+    split, split, assumption,
+    split, assumption },
+end
+
+lemma s_and_s_exists_distr {α : Type u}
+  (p : α → hprop) (q : hprop)
+: q :*: (∃∃ x, p x) = (∃∃ x, q :*: p x) :=
+begin
+  rw [s_and_comm,s_exists_s_and_distr], congr,
+  funext hp, ac_refl
+end
 
 section
 
@@ -168,22 +291,24 @@ lemma framing_right (q : hprop)
 begin
   unfold sat spec.pre spec.post,
   introv Hpart Hpre,
-  cases Hpre with h₂ Hpre, cases Hpre with h₃ Hpre,
+  cases Hpre with hp₂ Hpre, cases Hpre with hp₃ Hpre,
   cases Hpre with d Hpre,
   rw Hpre.left at Hpart,
   cases Hpre with Hpre₀ Hpre₁, cases Hpre₁ with Hpre₁ Hpre₂,
-  have Hdisj := disjoint_disjoint d (disjoint_of_part Hpart),
-  have h' := h σ h₂ (part' h₁ h₃ Hdisj) _ Hpre₁, unfold spec.pre spec.post at h',
+  have Hdisj := disjoint_disjoint_left d (disjoint_of_part Hpart),
+  have h' := h σ hp₂ (part' hp₁ hp₃ Hdisj) _ Hpre₁, unfold spec.pre spec.post at h',
   { rw part_comm at Hpart,
-    cases h' with x h', cases h' with σ' h', cases h' with h' h''',
+    cases h' with x h', cases h' with σ' h', cases h' with hp' h₀,
     existsi x, existsi σ',
-    have Hdisj' : h' ## h₃, admit,
-    cases h''' with hP Ph₁, cases Ph₁ with Ph₁ Ph₂,
-    existsi part' h' h₃ Hdisj',
+    have Hdisj' : hp' ## hp₃,
+    { have h₁ := disjoint_of_part h₀.right.left,
+      apply disjoint_disjoint_left _,
+      symmetry, assumption },
+    cases h₀ with hP Ph₁, cases Ph₁ with Ph₁ Ph₂,
+    existsi part' hp' hp₃ Hdisj',
     split, assumption,
     split,
-    { rw [part'_part_assoc _ _,part_comm' (disjoint_symm Hdisj')] at Ph₁,
-      apply Ph₁ },
+    { rw Ph₁, eq_heap },
     { apply s_and_part _ Ph₂ Hpre₂, } },
   { rw [part'_part_assoc _ (disjoint_symm Hdisj),part_comm'] at Hpart,
     apply Hpart, },
@@ -192,19 +317,59 @@ end
 lemma framing_left (q : hprop)
   (h : sat P { pre := p, post := r })
 : sat P { pre := q :*: p, post := λ x, q :*: r x } :=
-sorry
+begin
+  have h := framing_right q h,
+  apply eq.mp _ h,
+  apply congr_arg,
+  apply congr, ac_refl,
+  funext x,
+  ac_refl,
+end
 
 lemma bind_spec (r : α → hprop)
   (h  : sat P { pre := p, post := r })
   (h' : ∀ x, sat (P' x) { pre := r x, post := r' })
 : sat (P >>= P') { pre := p, post := r' } :=
-sorry
+begin
+  unfold sat, introv h₂ h₃,
+  have := h σ hp₀ hp₁ h₂ h₃,
+  cases this with x this, cases this with σ' this, cases this with hp' this,
+  have H₂ := h' x σ' hp' hp₁ this.right.left this.right.right,
+  revert H₂, simp,
+  intros y σ'' hp'' h'' H₀ H₁,
+  split, split, split,
+  existsi h'', existsi H₀,
+  simp [(>>=),state_t_bind],
+  apply nonterm.yields_bind,
+  { apply this.left },
+  { apply H₁, }
+end
 
 lemma postcondition (r : α → hprop)
  (Hspec : sat P { pre := p, post := r })
  (Hside : ∀ x, r x = r₁ x)
 : sat P { pre := p, post := r₁ } :=
-sorry
+begin
+  apply eq.mp _ Hspec,
+  congr, funext x,
+  apply Hside,
+end
+
+lemma postcondition' (r : α → hprop)
+ (Hspec : sat P { pre := p, post := r })
+ (Hside : ∀ x, r x =*> r₁ x)
+: sat P { pre := p, post := r₁ } :=
+begin
+  intros _ _ _ H₀ H₁,
+  specialize Hspec _ _ _ H₀ H₁,
+  revert Hspec,
+  apply exists_imp_exists, intro x,
+  apply exists_imp_exists, intro hp₀,
+  apply exists_imp_exists, intro hp₁,
+  apply and.imp_right,
+  apply and.imp_right,
+  apply Hside,
+end
 
 lemma precondition (p : hprop)
  (Hspec : sat P { pre := p, post := r })
@@ -216,7 +381,15 @@ lemma precondition' (p : hprop)
  (Hspec : sat P { pre := p, post := r })
  (Hside : q =*> p)
 : sat P { pre := q, post := r } :=
-sorry
+begin
+  revert Hspec, unfold sat,
+  apply forall_imp_forall _, intro σ,
+  apply forall_imp_forall _, intro hp₀,
+  apply forall_imp_forall _, intro hp₁,
+  apply forall_imp_forall _, intro,
+  intros h₀ h₁, apply h₀,
+  apply Hside _ h₁,
+end
 
 lemma bind_framing_left (p₁ : hprop)
   (H₀ : sat P { pre := p₀, post := r })
@@ -244,12 +417,19 @@ end
 lemma s_exists_intro_pre {α : Type u} {P : program β} {r : α → hprop}
   (H : ∀ x, sat P { pre := r x, post := r' })
 : sat P { pre := (∃∃ x, r x), post := r' } :=
-sorry
+begin
+  intros _ _ _ H₀ H₁,
+  cases H₁ with x H₁,
+  apply H x _ _ _ H₀ H₁,
+end
 
 lemma s_exists_elim_pre {α : Type u} {P : program β} {r : α → hprop} (x : α)
   (H : sat P { pre := (∃∃ x, r x), post := r' })
 : sat P { pre := r x, post := r' } :=
-sorry
+begin
+  intros _ _ _ H₀ H₁,
+  apply H _ _ _ H₀ ⟨_,H₁⟩,
+end
 
 lemma s_exists_replace_pre {t : Type w} {α : Type w'} {r : α → hprop} {P : program β}
   (f : t → α) (g : α → t) (I : left_inverse f g)
@@ -265,7 +445,17 @@ end
 lemma s_exists_intro_post {P : program β} {b : α → β → hprop} (x : α)
   (H : sat P { pre := p, post := b x })
 : sat P { pre := p, post := λ r, ∃∃ x, b x r } :=
-sorry
+begin
+  intros _ _ _ H₀ H₁,
+  specialize H _ _ _ H₀ H₁,
+  revert H,
+  apply exists_imp_exists, intro y,
+  apply exists_imp_exists, intro hp,
+  apply exists_imp_exists, intro hp',
+  apply and.imp_right,
+  apply and.imp_right,
+  apply Exists.intro x
+end
 
 lemma adapt_spec
   (h : sat P { pre := p₁, post := r₁ })
@@ -279,7 +469,22 @@ lemma adapt_spec'
   (Hpre : p =*> p₁)
   (Hpost : ∀ x, r x = r₁ x)
 : sat P { pre := p, post := λ x, r x } :=
-sorry
+begin
+  apply precondition' _ _ Hpre,
+  apply postcondition r₁ h,
+  intro, symmetry, apply Hpost
+end
+
+lemma framing_spec'  (q : hprop)
+  (h : sat P { pre := p₁, post := r₁ })
+  (Hpre : p =*> p₁ :*: q)
+  (Hpost : ∀ x, r₁ x :*: q =*> r x)
+: sat P { pre := p, post := λ x, r x } :=
+begin
+  apply precondition' _ _ Hpre,
+  apply postcondition' _ _ Hpost,
+  apply framing_right _ h,
+end
 
 lemma framing_spec  (q : hprop)
   (h : sat P { pre := p₁, post := r₁ })
@@ -291,25 +496,22 @@ begin
   apply framing_right _ h
 end
 
-lemma framing_spec'  (q : hprop)
-  (h : sat P { pre := p₁, post := r₁ })
-  (Hpre : p =*> p₁ :*: q)
-  (Hpost : ∀ x, r₁ x :*: q =*> r x)
-: sat P { pre := p, post := λ x, r x } :=
-sorry
-
 lemma context_left (p : Prop)
  (H : p → sat P { pre := q, post := r })
-: sat P { pre := [| p |] :*: q, post := r } := sorry
+: sat P { pre := [| p |] :*: q, post := r } :=
+begin
+  intros _ _ _ H₀ H₁,
+  simp at H₁,
+  apply H H₁.1 _ _ _ H₀ H₁.2,
+end
 
 lemma context_right (p : Prop)
  (H : p → sat P { pre := q, post := r })
-: sat P { pre := q :*: [| p |], post := r } := sorry
-
-lemma option.get_eq_of_is_some {x : option α}
-  (h : option.is_some x)
-: x = some (option.get h) :=
-sorry
+: sat P { pre := q :*: [| p |], post := r } :=
+begin
+  rw s_and_comm,
+  apply context_left _ H
+end
 
 lemma return.spec' {α : Type} (x : α) (p : hprop)
 : sat (return x) { pre := p, post := λ _, p } :=
@@ -414,7 +616,36 @@ end
 lemma free.spec (p : pointer) (n : ℕ) (vs : list word)
   (h : n = length vs)
 : sat (free p n) { pre := p ↦* vs, post := λ r, emp } :=
-sorry
+begin
+  unfold sat,
+  introv H₀ H₁,
+  existsi [()],
+  split, existsi heap.emp,
+  simp [free,state_t.read,state_t.write],
+  rw and_comm,
+  split, simp [(>>=)],
+  simp [state_t_bind,monad.pure_bind],
+  apply nonterm.pure_yields,
+  simp, subst n,
+  congr, simp [points_to_multiple] at H₁,
+  revert H₀ hp₁ p,
+  generalize : σ.heap = hp,
+  revert hp hp₀,
+  induction vs with v vs
+  ; intros
+  ; simp [points_to_multiple] at H₁,
+  { subst hp₀, simp at H₀, injection H₀, },
+  { dsimp [length,add_one],
+    have H := disjoint_of_part H₀,
+    have H₁ : (maplet p v) ## hp₁, admit,
+    have H₂ : heap.delete p 1 hp₀ ## part' (maplet p v) hp₁, admit,
+    specialize ih_1 (part' (heap.delete p 1 hp₀) (part' (maplet p v) hp₁))
+         (heap.delete p 1 hp₀) (p+1) (part' (maplet p v) hp₁ H₁) _ _,
+    have H₃ : heap.delete p 1 hp₀ ## maplet p v, admit,
+    rw [←  part'_part'_assoc H₃] at ih_1,
+    admit, admit, admit, admit,
+ }
+end
 
 lemma free1.spec (p : pointer) (v : word)
 : sat (free1 p) { pre := p ↦ v, post := λ r, emp } :=
