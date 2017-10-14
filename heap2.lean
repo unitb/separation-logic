@@ -45,6 +45,12 @@ lemma disjoint_of_is_some_part_
 : hp₀ ## hp₁ :=
 sorry
 
+lemma disjoint_of_part__eq_some
+  {hp₀ hp₁ hp₂ : heap}
+  (h : some hp₂ = (part_ (some hp₀) (some hp₁)))
+: hp₀ ## hp₁ :=
+sorry
+
 lemma is_some_of_is_some_part__right
   (hp₀ : option heap) {hp₁ : option heap}
   (h : (part_ hp₀ hp₁).is_some)

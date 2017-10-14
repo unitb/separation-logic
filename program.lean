@@ -183,16 +183,17 @@ s ← state_t.read,
 if h : (s.heap p).is_some then
   state_t.write
     { s with
-      heap := (λ q : pointer, if p = q then some v else s.heap q)
+      heap := s.heap.insert p v
     , free :=
       begin
         intros q h',
+        simp [heap.insert],
         by_cases p = q with h'',
-        { rw if_pos h'',
+        { rw [if_pos h''],
           exfalso, subst q,
           have h₃ := s.free p h',
           admit },
-        { rw if_neg h'', apply s.free _ h' }
+        { rw [if_neg h''], apply s.free _ h' }
       end }
 else state_t.lift nonterm.diverge
 

@@ -341,6 +341,19 @@ lemma parts_singleton (hp : heap)
 : some hp = parts [hp] :=
 sorry
 
+def heap.insert (hp : heap) (p : pointer) (v : word) : heap
+ | q := if p = q then some v else hp q
+
+lemma part'_insert (hp hp' : heap) (p : pointer) (v : word)
+  (h₀ : hp.insert p v ## hp')
+  (h₁ : hp ## hp')
+: part' (hp.insert p v) hp' = (part' hp hp').insert p v :=
+sorry
+
+lemma maplet_insert_disjoint_iff (p : pointer) (v v' : word) (hp : heap)
+: (maplet p v).insert p v' ## hp ↔ maplet p v ## hp :=
+sorry
+
 namespace tactic.interactive
 
 open tactic

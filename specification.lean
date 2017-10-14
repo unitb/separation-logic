@@ -4,6 +4,8 @@ import util.logic
 import util.data.option
 import util.control.applicative
 import util.control.monad.non_termination
+import util.control.monad.state
+import util.meta.tactic.monotonicity
 import separation.heap
 import separation.heap2
 import separation.program
@@ -289,8 +291,7 @@ begin
   specialize h σ hp₂ (part' hp₃ hp₁),
   simp [Hpart] at h, specialize h (by ac_refl) Hpre₁,
   revert h,
-  apply exists_imp_exists, intro rr,
-  apply exists_imp_exists, intro σ',
+  intros_mono rr σ',
   simp, intros hp' Hr H_yield H_p',
   have Hd_p'_p₃ : hp' ## hp₃,
   { apply disjoint_of_is_some_part_,
@@ -327,9 +328,7 @@ begin
   cases h with Hspec₁ Hspec₂, simp at Hspec₂,
   specialize h' x σ' hp' hp₁ Hspec₁ Hspec₂,
   revert h',
-  apply exists_imp_exists, intros r'',
-  apply exists_imp_exists, intros σ'',
-  apply exists_imp_exists, intros hp'',
+  intros_mono r'' σ'' hp'',
   apply and.imp, intros h₀,
   apply nonterm.yields_bind _ _ Hspec₀,
   apply h₀, apply id,
@@ -353,11 +352,7 @@ begin
   intros _ _ _ H₀ H₁,
   specialize Hspec _ _ _ H₀ H₁,
   revert Hspec,
-  apply exists_imp_exists, intro x,
-  apply exists_imp_exists, intro hp₀,
-  apply exists_imp_exists, intro hp₁,
-  apply and.imp_right,
-  apply and.imp_right,
+  intros_mono x hp₀ hp₁ _ _,
   apply Hside,
 end
 
@@ -439,11 +434,7 @@ begin
   intros _ _ _ H₀ H₁,
   specialize H _ _ _ H₀ H₁,
   revert H,
-  apply exists_imp_exists, intro y,
-  apply exists_imp_exists, intro hp,
-  apply exists_imp_exists, intro hp',
-  apply and.imp_right,
-  apply and.imp_right,
+  intros_mono y hp hp' _ _,
   apply Exists.intro x
 end
 
@@ -576,7 +567,34 @@ end
 
 lemma write.spec (p : pointer) (v v' : word)
 : sat (write p v') { pre := p ↦ v, post := λ r, p ↦ v' } :=
-sorry
+begin
+  intros _ _ _ H₀ H₁,
+  unfold write,
+  existsi (),
+  split, existsi (hp₀.insert p v'),
+  simp [state_t.read_bind],
+  split,
+  { change _ = _ at H₁,
+    change _ = _, rw H₁,
+    funext x,
+    by_cases p = x with h ;
+    simp [heap.insert,maplet,h], },
+  rw [and_comm], split,
+  { rw [dif_pos,state_t.write],
+    apply nonterm.pure_yields,
+    simp [points_to] at H₁,
+    rw [← opt_apl_some σ.heap,H₀,H₁,opt_apl_part__maplet ],
+    exact rfl,
+    subst hp₀,
+    apply disjoint_of_part__eq_some H₀ },
+  { have H := disjoint_of_part__eq_some H₀,
+    rw [← some_part',part'_insert _ _ _ _ _ H],
+    rw ← some_part' _ _ H at H₀, injection H₀,
+    simp, rw [h_1],
+    { change _ = _ at H₁, subst hp₀,
+      rw maplet_insert_disjoint_iff,
+      assumption }, }
+end
 
 def replace {α} (f : α → α) : ℕ → list α → list α
   | i [] := []
@@ -585,14 +603,30 @@ def replace {α} (f : α → α) : ℕ → list α → list α
 
 lemma write_head.spec (p : pointer) (v v' : word) (vs : list word)
 : sat (write p v') { pre := p ↦* v :: vs, post := λ _, p ↦* v' :: vs } :=
-sorry
+begin
+  simp [(↦*)],
+  apply framing_right,
+  apply write.spec,
+end
 
 lemma write_nth.spec (p : pointer) (v' : word) (i : ℕ) (vs : list word)
   (H : i < vs.length)
 : sat (write_nth p i _ v' H)
    { pre := p ↦* vs
    , post := λ _, p ↦* replace (const _ v') i vs } :=
-sorry
+begin
+  revert p i,
+  induction vs with v vs ; intros p i H,
+  { cases not_lt_zero _ H },
+  cases i with i,
+  { simp [write_nth],
+    apply write_head.spec },
+  { simp [write_nth,add_succ,replace,(↦*)],
+    rw ← succ_add,
+    apply framing_left,
+    apply ih_1,
+    apply lt_of_succ_lt_succ H, }
+end
 
 lemma modify.spec (p : pointer) (f : word → word) (v : word)
 : sat (modify p f) { pre := p ↦ v, post := λ _, p ↦ f v } :=
