@@ -83,6 +83,30 @@ def points_to_multiple : ∀ (p : ℕ), list word → hprop
 
 infix ` ↦* `:60 := points_to_multiple
 
+lemma points_to_multiple_iff_eq_heap_mk
+  (p : pointer) (vs : list word) (hp : heap)
+: (p ↦* vs).apply hp ↔ hp = heap.mk p vs :=
+begin
+  revert p hp,
+  induction vs with v vs ; intros p hp,
+  { simp [points_to_multiple], refl },
+  { simp [points_to_multiple,heap.mk],
+    split,
+    { simp [s_and],
+      intros hp₀ H₀ hp₁ H₁ H₂,
+      rw ih_1 at H₁,
+      change _ = _ at H₀,
+      subst hp₀, subst hp₁,
+      have := eq_part'_of_some_eq_part_ _ _ _ H₂,
+      apply this },
+    { intros h₀,
+      simp [s_and],
+      existsi [maplet p v,rfl,heap.mk (p + 1) vs],
+      rw ih_1, existsi rfl,
+      subst hp, rw [← some_part'],
+      refl, apply maplet_disjoint_heap_mk } }
+end
+
 structure spec (r : Type u) :=
   (pre : hprop)
   (post : r → hprop)
@@ -736,7 +760,10 @@ begin
   simp [state_t_bind,monad.pure_bind],
   apply nonterm.pure_yields,
   simp, subst n,
-  admit
+  rw points_to_multiple_iff_eq_heap_mk at H₁,
+  rw H₁ at H₀,
+  have H₂ := eq_part'_of_some_eq_part_ _ _ _ H₀,
+  rw [H₂,delete_part'_heap_mk],
 end
 
 lemma free1.spec (p : pointer) (v : word)

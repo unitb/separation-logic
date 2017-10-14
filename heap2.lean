@@ -51,6 +51,13 @@ lemma disjoint_of_part__eq_some
 : hp₀ ## hp₁ :=
 sorry
 
+lemma eq_part'_of_some_eq_part_
+  (hp₀ hp₁ hp : heap)
+  (h : some hp = part_ (some hp₀) (some hp₁))
+: hp = part' hp₀ hp₁ (disjoint_of_part__eq_some h) :=
+by { apply @option.no_confusion _ _ (some hp) (some _) _ id,
+     simp [h], }
+
 lemma is_some_of_is_some_part__right
   (hp₀ : option heap) {hp₁ : option heap}
   (h : (part_ hp₀ hp₁).is_some)

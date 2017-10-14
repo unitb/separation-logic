@@ -266,6 +266,11 @@ begin
   { simp [part', heap.delete, maplet, if_neg, h] }
 end
 
+lemma delete_part'_heap_mk {p : pointer} {vs : list word} {hp : heap}
+  (h : heap.mk p vs ## hp)
+: heap.delete p (length vs) (part' (heap.mk p vs) hp) = hp :=
+sorry
+
 lemma disjoint_disjoint_left {h₁ h₂ h₃ : heap}
   (H₁ : h₂ ## h₃)
   (H₀ : part' h₂ h₃ H₁ ## h₁)
@@ -382,8 +387,6 @@ do (hs₀,p₀) ← flat_heap_expr h₀,
    return (hs₀ ++ hs₁,p)
  | e := fail "expecting expression of the form `part ?m ?m`"
 
-#print option.no_confusion_type
-
 meta def flatten_heap : tactic unit :=
 do t ← target,
    (e₀,e₁) ← expr.is_eq t,
@@ -408,8 +411,6 @@ do t ← target,
    rewrite_target p₁,
    `[apply parts_congr, simp],
    prove_perm
-
-#check perm
 
 section
 
