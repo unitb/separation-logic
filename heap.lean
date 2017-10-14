@@ -71,6 +71,10 @@ def heap.mk : pointer → list word → heap
 | _ [] := heap.emp
 | p (v :: vs) := λ q, maplet p v q <|> heap.mk (p+1) vs q
 
+lemma maplet_disjoint_heap_mk (p : pointer) (v : word) (vs : list word)
+: disjoint (maplet p v) (heap.mk (p + 1) vs) :=
+sorry
+
 def left_combine (h₀ h₁ : heap) : heap
  | p := h₀ p <|> h₁ p
 

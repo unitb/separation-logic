@@ -208,7 +208,7 @@ modify (p+i) f
 
 def alloc (vs : list word) : program pointer := do
 s ← state_t.read,
-let r := s.next,
+let r := s.next + 1,
 state_t.write
   { s with next := s.next + vs.length,
            heap := heap.mk r vs <+ s.heap,

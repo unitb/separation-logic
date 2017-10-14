@@ -669,7 +669,49 @@ end
 
 lemma alloc.spec (vs : list word)
 : sat (alloc vs) { pre := emp, post := λ r, [| r ≠ 0 |] :*: r ↦* vs } :=
-sorry
+begin
+  simp [alloc,sat],
+  intros _ _ _ H₀ H₁,
+  simp [state_t.read_bind],
+  existsi σ.next+1, split,
+  existsi heap.mk (σ.next+1) vs,
+  split,
+  { generalize : σ.next+1 = p, revert p,
+    induction vs with v vs ; intro p,
+    { exact rfl },
+    { simp [points_to_multiple,heap.mk,s_and],
+      existsi [maplet p v,rfl,heap.mk (p + 1) vs
+              ,ih_1 (p+1)],
+      rw ← some_part', congr,
+      apply maplet_disjoint_heap_mk } },
+  split,
+  { apply ne_of_gt, apply zero_lt_succ },
+  rw and_comm, split,
+  { simp [state_t.write,has_bind.bind,return],
+    simp [state_t_bind,monad.pure_bind],
+    apply nonterm.pure_yields, },
+  { simp [H₁] at H₀,
+    have : heap.mk (σ.next + 1) vs ## hp₁,
+    { intro, simp [or_iff_not_imp],
+      intro h, rw ← H₀,
+      apply σ.free,
+      apply le_of_not_gt, intro h',
+      apply h, clear h,
+      revert h',
+      generalize : σ.next = k, revert k,
+      induction vs with v vs ; intros k h', refl,
+      simp [heap.mk,maplet],
+      have : k+1 > p,
+      { transitivity k, apply lt_succ_self,
+        apply h' },
+      split,
+      { apply ih_1 (k+1) this, },
+      { apply if_neg,
+        apply ne_of_gt this, } },
+    simp [H₀],
+    rw ← some_part' _ _ this,
+    congr, },
+end
 
 lemma alloc1.spec (v : word)
 : sat (alloc1 v) { pre := emp, post := λ r, [| r ≠ 0 |] :*: r ↦ v } :=
