@@ -2,15 +2,25 @@ import separation.heap
 
 universes u
 
-noncomputable def part_  (h₀ h₁ : option heap) : option heap :=
-h₀ >>= λ h, h₁ >>= part h
+section classical
+
+local attribute [instance] classical.prop_decidable
+
+noncomputable def part_  : option heap → option heap → option heap
+| (some hp₀) (some hp₁) :=
+if h : hp₀ ## hp₁
+then some $ part' hp₀ hp₁
+else none
+| _ _ := none
+
+end classical
 
 @[simp]
 lemma some_part'
   (hp₀ hp₁ : heap)
   (h : hp₀ ## hp₁)
 : some (part' hp₀ hp₁) = part_ (some hp₀) (some hp₁) :=
-by { simp [part_,part,bind,option.bind,dif_pos, h], }
+by { simp [part_,bind,option.bind,dif_pos, h], }
 
 @[simp]
 lemma heap_emp_part_
@@ -87,8 +97,58 @@ lemma opt_apl_part__maplet (hp : heap) (p : pointer) (v : word)
   (h : maplet p v ## hp)
 : (opt_apl (part_ (some (maplet p v)) (some hp)) p) = some v :=
 begin
-  simp [part_,has_bind.bind,option.bind],
-  rw [part,dif_pos,opt_apl,part',maplet,if_pos rfl],
+  unfold part_,
+  rw [dif_pos] ; [ skip , apply h ],
+  rw [opt_apl,part',maplet,if_pos rfl],
   refl,
-  assumption
+end
+
+@[simp]
+lemma eq_emp_of_part_ (a : heap) (hp : option heap)
+: some a = part_ (some a) hp ↔ hp = some heap.emp :=
+sorry
+
+@[simp]
+lemma part'_eq_emp (a b : option heap)
+: part_ a b = some heap.emp ↔ a = some heap.emp ∧ b = some heap.emp :=
+sorry
+
+def heap.le (hp₀ hp₁ : heap) : Prop :=
+∃ hp, some hp₁ = part_ (some hp₀) hp
+
+instance : has_le heap :=
+⟨ heap.le ⟩
+
+instance : partial_order heap :=
+{ le := heap.le
+, le_refl := by { intro x, existsi (some heap.emp), simp, }
+, le_trans := by { introv,
+                   simp [has_le.le,heap.le],
+                   intros hp₀ h₀ hp₁ h₁,
+                   -- have : hp₀ ## hp₁, admit,
+                   existsi part_ hp₀ hp₁,
+                   simp [h₁,h₀], ac_refl }
+, le_antisymm := by { introv,
+                      simp [has_le.le,heap.le],
+                      intros hp₀ h₀ hp₁ h₁,
+                      simp [h₀,part__assoc] at h₁,
+                      simp [h₁.left] at h₀,
+                      subst b, }
+}
+
+lemma part'_delete_maplet (p : pointer) (v : word) (hp : heap)
+  (h : heap.delete p 1 hp ## maplet p v)
+  (h' : maplet p v ≤ hp)
+: part' (heap.delete p 1 hp) (maplet p v) = hp :=
+begin
+  funext p',
+  by_cases (p = p') with h,
+  { simp [part', heap.delete, maplet, if_pos, h],
+    unfold has_le.le heap.le at h',
+    cases h' with hp' h', cases hp' with hp',
+    { contradiction },
+    have h₂ := eq_part'_of_some_eq_part_ _ _ _ h',
+    rw [h₂,part',maplet,if_pos h],
+    simp },
+  { simp [part', heap.delete, maplet, if_neg, h] }
 end
