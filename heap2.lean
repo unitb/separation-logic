@@ -47,7 +47,7 @@ do (some ()) ← try_core x | tactic.skip,
 
 meta def expand_part_ite : tactic unit :=
 do tactic.try `[ dsimp [part] ],
-   tactic.reflexivity <|> try_then (ite_cases `h) expand_part_ite
+   tactic.reflexivity <|> try_then (ite_cases none $ loc.ns [none]) expand_part_ite
 
 meta def break_disjoint_asm_symm (l : expr)
 : tactic unit :=
@@ -141,7 +141,14 @@ end
 lemma part_comm
   (a b : option heap)
 : part a b = part b a :=
-sorry
+begin
+  cases a ; cases b
+  ; dsimp [part] ; try { refl }
+  ; ite_cases with i
+  ; ite_cases with i'
+  ; try { contradict_asm, symmetry, assumption },
+  rw part'_comm,
+end
 
 instance : is_associative (option heap) part :=
 ⟨ part_assoc ⟩
@@ -152,13 +159,16 @@ lemma disjoint_of_is_some_part
   {hp₀ hp₁ : heap}
   (h : (part (some hp₀) (some hp₁)).is_some)
 : hp₀ ## hp₁ :=
-sorry
+by { dsimp [part] at h,
+     ite_cases with h at h,
+     contradiction,
+     assumption }
 
 lemma disjoint_of_part_eq_some
   {hp₀ hp₁ hp₂ : heap}
   (h : some hp₂ = (part (some hp₀) (some hp₁)))
 : hp₀ ## hp₁ :=
-sorry
+by { apply disjoint_of_is_some_part, rw ← h, exact rfl }
 
 lemma eq_part'_of_some_eq_part
   (hp₀ hp₁ hp : heap)
@@ -171,18 +181,20 @@ lemma is_some_of_is_some_part_right
   (hp₀ : option heap) {hp₁ : option heap}
   (h : (part hp₀ hp₁).is_some)
 : hp₁.is_some :=
-sorry
+by { cases hp₀ ; cases hp₁ ; try { contradiction },
+     exact rfl }
 
 lemma is_some_of_is_some_part_left
   {hp₀ : option heap} (hp₁ : option heap)
   (h : (part hp₀ hp₁).is_some)
 : hp₀.is_some :=
-sorry
+by { cases hp₀ ; cases hp₁ ; try { contradiction },
+     exact rfl }
 
 @[simp]
 lemma some_eq_some_iff (x y : heap)
 : some x = some y ↔ x = y :=
-sorry
+by { split ; intro h, injection h, subst x }
 
 def opt_apl : option heap → pointer → option word
  | (some hp) p := hp p
@@ -205,12 +217,43 @@ end
 @[simp]
 lemma eq_emp_of_part (a : heap) (hp : option heap)
 : some a = part (some a) hp ↔ hp = some heap.emp :=
-sorry
+begin
+  cases hp ; dsimp [part],
+  split ; intro h ; contradiction,
+  ite_cases with h₀,
+  split ; intros h₁,
+  { contradiction },
+  { injection h₁ with h₂, simp [h₂] at h₀,
+    cases h₀, },
+  split ; intro h₁ ; injection h₁ with h₂,
+  { simp [eq_emp_of_part'] at h₂,
+    simp [h₂] },
+  { simp [h₂], }
+end
 
 @[simp]
 lemma part'_eq_emp (a b : option heap)
 : part a b = some heap.emp ↔ a = some heap.emp ∧ b = some heap.emp :=
-sorry
+begin
+  split ; simp_intros h ;
+  cases a ; cases b
+  ; try { refl }
+  ; try { cases h with h₀ h₁ }
+  ; try { contradiction }
+  ; try { rw [h₀,h₁,← some_part' _ _ (disjoint_heap_emp _)
+             ,heap_emp_part'_eq_self] },
+  { unfold part at h,
+    revert h, ite_cases with h,
+    contradiction,
+    intro h₀,
+    injection h₀ with h₁,
+    have h₂ : ∀ p, part' a a_1 h p = heap.emp p,
+    { intro, rw h₁ },
+    simp [part',heap.emp] at h₂,
+    split ; congr ; funext p,
+    { simp [(h₂ p).left], refl },
+    { simp [(h₂ p).right], refl }, }
+end
 
 def heap.le (hp₀ hp₁ : heap) : Prop :=
 ∃ hp, some hp₁ = part (some hp₀) hp

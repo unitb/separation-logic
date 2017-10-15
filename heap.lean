@@ -92,7 +92,7 @@ lemma disjoint_symm {h₀ h₁ : heap}
 : h₁ ## h₀ :=
 assume p, or.symm (h p)
 
-lemma part_comm' {h₀ h₁ : heap}
+lemma part'_comm {h₀ h₁ : heap}
   (h : h₀ ## h₁)
 : part' h₀ h₁ = part' h₁ h₀ (disjoint_symm h) :=
 begin
@@ -179,7 +179,7 @@ lemma disjoint_of_part'_disjoint_left {h₁ h₂ h₃ : heap}
 begin
   have H₁ := disjoint_symm H₁,
   apply disjoint_of_part'_disjoint_right H₁,
-  rw part_comm', apply H₀,
+  rw part'_comm, apply H₀,
 end
 
 lemma disjoint_of_disjoint_part'_right {h₁ h₂ h₃ : heap}
