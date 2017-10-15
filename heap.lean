@@ -132,7 +132,7 @@ lemma eq_emp_of_part' (hp a : heap)
 : a = part' a hp ↔ hp = heap.emp :=
 sorry
 
-lemma part'_part'_assoc {h₀ h₁ h₂ : heap}
+lemma part'_assoc {h₀ h₁ h₂ : heap}
   (Hdisj₀ : h₀ ## h₁)
   (Hdisj₁ : h₁ ## h₂)
   (Hdisj₂ : part' h₀ h₁ ## h₂)
@@ -145,9 +145,23 @@ lemma delete_part'_heap_mk {p : pointer} {vs : list word} {hp : heap}
 : heap.delete p (length vs) (part' (heap.mk p vs) hp) = hp :=
 sorry
 
-lemma disjoint_disjoint_left {h₁ h₂ h₃ : heap}
+lemma part'_disjoint {h₁ h₂ h₃ : heap}
+  {H₀ : h₂ ## h₃}
+  (H₁ : h₁ ## h₃)
+  (H₁ : h₁ ## h₂)
+: part' h₂ h₃ ## h₁ :=
+sorry
+
+lemma disjoint_part' {h₁ h₂ h₃ : heap}
+  {H₀ : h₂ ## h₃}
+  (H₁ : h₁ ## h₃)
+  (H₁ : h₁ ## h₂)
+: h₁ ## part' h₂ h₃ :=
+sorry
+
+lemma disjoint_of_part'_disjoint_right {h₁ h₂ h₃ : heap}
   (H₁ : h₂ ## h₃)
-  (H₀ : part' h₂ h₃ H₁ ## h₁)
+  (H₀ : part' h₂ h₃ ## h₁)
 : h₁ ## h₃ :=
 begin
   intro p,
@@ -158,15 +172,27 @@ begin
   { simp [H₂] }
 end
 
-lemma disjoint_disjoint_right {h₁ h₂ h₃ : heap}
+lemma disjoint_of_part'_disjoint_left {h₁ h₂ h₃ : heap}
   (H₁ : h₂ ## h₃)
-  (H₀ : part' h₂ h₃ H₁ ## h₁)
+  (H₀ : part' h₂ h₃ ## h₁)
 : h₁ ## h₂ :=
 begin
   have H₁ := disjoint_symm H₁,
-  apply disjoint_disjoint_left H₁,
+  apply disjoint_of_part'_disjoint_right H₁,
   rw part_comm', apply H₀,
 end
+
+lemma disjoint_of_disjoint_part'_right {h₁ h₂ h₃ : heap}
+  (H₁ : h₂ ## h₃)
+  (H₀ : h₁ ## part' h₂ h₃)
+: h₁ ## h₃ :=
+sorry
+
+lemma disjoint_of_disjoint_part'_left {h₁ h₂ h₃ : heap}
+  (H₁ : h₂ ## h₃)
+  (H₀ : h₁ ## part' h₂ h₃)
+: h₁ ## h₂ :=
+sorry
 
 def heap.insert (hp : heap) (p : pointer) (v : word) : heap
  | q := if p = q then some v else hp q

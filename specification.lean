@@ -28,7 +28,7 @@ notation `[| `p` |]` := embed p
 
 def s_and (p q : hprop) : hprop :=
 ⟨ λ h, ∃ hp₀ hp₁,
-         some h = part_ (some hp₀) (some hp₁) ∧
+         some h = part (some hp₀) (some hp₁) ∧
          p.apply hp₀ ∧
          q.apply hp₁ ⟩
 
@@ -97,7 +97,7 @@ begin
       rw ih_1 at H₁,
       change _ = _ at H₀,
       subst hp₀, subst hp₁,
-      have := eq_part'_of_some_eq_part_ _ _ _ H₂,
+      have := eq_part'_of_some_eq_part _ _ _ H₂,
       apply this },
     { intros h₀,
       simp [s_and],
@@ -113,10 +113,10 @@ structure spec (r : Type u) :=
 
 def sat {α} (p : program α) (s : spec α) : Prop :=
 ∀ (σ : hstate) hp₀ hp₁,
-   some σ.heap = part_ (some hp₀) (some hp₁) →
+   some σ.heap = part (some hp₀) (some hp₁) →
    s.pre.apply hp₀ →
 (∃ r σ' hp', p σ ~> (r, σ') ∧
-            some σ'.heap = part_ (some hp') (some hp₁) ∧
+            some σ'.heap = part (some hp') (some hp₁) ∧
             (s.post r).apply hp')
 
 lemma s_and_part {hp₀ hp₁ : heap} {p₀ p₁ : hprop}
@@ -172,8 +172,8 @@ begin
   { intros hp_pq hp_r Hr Hd_pqr,
     intros hp_p Hp hp_q Hq Hpq,
     have Hd_qr : hp_q ## hp_r,
-    { apply disjoint_of_is_some_part_,
-      apply is_some_of_is_some_part__right (some hp_p),
+    { apply disjoint_of_is_some_part,
+      apply is_some_of_is_some_part_right (some hp_p),
       apply is_some_of_eq_some hp,
       simp [Hd_pqr,Hpq], ac_refl },
     existsi [hp_p,Hp,part' hp_q hp_r Hd_qr],
@@ -184,8 +184,8 @@ begin
   { intros hp_p Hp hp_qr Hd_pqr,
     intros hp_q Hq hp_r Hr H_qr,
     have Hd_pq : hp_p ## hp_q,
-    { apply disjoint_of_is_some_part_,
-      apply is_some_of_is_some_part__right (some hp_r),
+    { apply disjoint_of_is_some_part,
+      apply is_some_of_is_some_part_right (some hp_r),
       apply is_some_of_eq_some hp,
       simp [Hd_pqr,H_qr], ac_refl },
     let hp_pq := part' hp_p hp_q,
@@ -308,8 +308,8 @@ begin
   cases Hpre with Hpre₀ Hpre₁, cases Hpre₁ with Hpre₁ Hpre₂,
   simp [Hpart],
   have h' : hp₃ ## hp₁,
-  { apply disjoint_of_is_some_part_,
-    apply is_some_of_is_some_part__right (some hp₂),
+  { apply disjoint_of_is_some_part,
+    apply is_some_of_is_some_part_right (some hp₂),
     apply is_some_of_eq_some σ.heap,
     simp [Hpart], ac_refl },
   specialize h σ hp₂ (part' hp₃ hp₁),
@@ -318,8 +318,8 @@ begin
   intros_mono rr σ',
   simp, intros hp' Hr H_yield H_p',
   have Hd_p'_p₃ : hp' ## hp₃,
-  { apply disjoint_of_is_some_part_,
-    apply is_some_of_is_some_part__right (some hp₁),
+  { apply disjoint_of_is_some_part,
+    apply is_some_of_is_some_part_right (some hp₁),
     apply is_some_of_eq_some σ'.heap,
     simp [H_p'], ac_refl },
   existsi [part' hp' hp₃,s_and_part _ Hr Hpre₂,H_yield],
@@ -546,10 +546,10 @@ begin
     simp [points_to] at H₁,
     simp [state_t_bind._match_1,state_t.lift],
     simp [H₁] at H₀,
-    rw [← opt_apl_some (σ.heap) p,H₀,opt_apl_part__maplet],
+    rw [← opt_apl_some (σ.heap) p,H₀,opt_apl_part_maplet],
     simp [monad.pure_bind],
     apply nonterm.pure_yields,
-    apply disjoint_of_is_some_part_,
+    apply disjoint_of_is_some_part,
     apply is_some_of_eq_some σ.heap H₀, },
 end
 
@@ -607,11 +607,11 @@ begin
   { rw [dif_pos,state_t.write],
     apply nonterm.pure_yields,
     simp [points_to] at H₁,
-    rw [← opt_apl_some σ.heap,H₀,H₁,opt_apl_part__maplet ],
+    rw [← opt_apl_some σ.heap,H₀,H₁,opt_apl_part_maplet ],
     exact rfl,
     subst hp₀,
-    apply disjoint_of_part__eq_some H₀ },
-  { have H := disjoint_of_part__eq_some H₀,
+    apply disjoint_of_part_eq_some H₀ },
+  { have H := disjoint_of_part_eq_some H₀,
     rw [← some_part',part'_insert _ _ _ _ _ H],
     rw ← some_part' _ _ H at H₀, injection H₀,
     simp, rw [h_1],
@@ -762,7 +762,7 @@ begin
   simp, subst n,
   rw points_to_multiple_iff_eq_heap_mk at H₁,
   rw H₁ at H₀,
-  have H₂ := eq_part'_of_some_eq_part_ _ _ _ H₀,
+  have H₂ := eq_part'_of_some_eq_part _ _ _ H₀,
   rw [H₂,delete_part'_heap_mk],
 end
 
