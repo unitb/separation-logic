@@ -399,9 +399,26 @@ begin
     refl },
   { funext q,
     simp [heap.delete],
-    ite_cases,
-    { simp [ih_1,part',heap.delete,if_neg,h_1], },
-    { simp [part',heap.delete,if_pos,h_1], } }
+    ite_cases with h',
+    { simp [ih_1,part',heap.delete,if_neg,h'], },
+    { simp [part',heap.delete,if_pos,h'], } }
+end
+
+lemma heap_delete_maplet (p q : pointer) (k : ℕ) (v : word)
+  (h : p < q)
+: heap.delete q k (maplet p v) = maplet p v :=
+begin
+  funext x,
+  revert q,
+  induction k with k ; intros q h, refl,
+  { simp [heap.delete],
+    ite_cases, apply @ih_1 (q + 1) _,
+    { transitivity q, assumption,
+      apply lt_succ_self },
+    simp [maplet],
+    subst x,
+    rw if_neg,
+    apply ne_of_lt h },
 end
 
 lemma delete_part'_heap_mk {p : pointer} {vs : list word} {hp : heap}
@@ -416,9 +433,17 @@ begin
     simp [length,add_one,heap.delete],
     ite_cases,
     { simp [heap_mk_cons],
-      have h₁ : heap.mk (p + 1) vs ## hp, admit,
+      have h₁ : heap.mk (p + 1) vs ## hp,
+      { simp [heap.mk] at h₀,
+        intro p',
+        specialize h₀ p',
+        rw or_iff_not_imp at h₀ ⊢,
+        intros h₁, apply h₀,
+        rw or_else_eq_none_iff,
+        revert h₁, apply mt,
+        apply and.elim_right, },
       have h₂ : heap.delete (succ p) (length vs) (maplet p v) = maplet p v,
-      { admit },
+      { apply heap_delete_maplet, apply lt_succ_self, },
       simp [part'_assoc,delete_over_part',ih_1 h₁,h₂,part',maplet,if_neg,h], },
   { have h₁ : maplet p v ## hp,
     { rw heap_mk_cons at h₀, prove_disjoint },
@@ -435,10 +460,24 @@ lemma part'_insert (hp hp' : heap) (p : pointer) (v : word)
   (h₀ : hp.insert p v ## hp')
   (h₁ : hp ## hp')
 : part' (hp.insert p v) hp' = (part' hp hp').insert p v :=
-sorry
+begin
+  funext x,
+  simp [part',heap.insert],
+  ite_cases,
+  simp [some_or_else],
+end
 
 lemma maplet_insert_disjoint_iff (p : pointer) (v v' : word) (hp : heap)
 : (maplet p v).insert p v' ## hp ↔ maplet p v ## hp :=
-sorry
+begin
+  simp [disjoint,heap.insert],
+  apply forall_congr,
+  intro p',
+  ite_cases,
+  simp [maplet,if_pos,h],
+  apply or_congr,
+  refl,
+  split ; intro ; contradiction
+end
 
 end heap
