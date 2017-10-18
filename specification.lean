@@ -5,7 +5,7 @@ import util.data.option
 import util.control.applicative
 import util.control.monad.non_termination
 import util.control.monad.state
-import util.meta.tactic.monotonicity
+import util.meta.tactic
 import separation.heap
 import separation.heap2
 import separation.program

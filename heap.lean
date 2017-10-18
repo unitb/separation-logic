@@ -9,6 +9,46 @@ import util.meta.tactic
 
 universes u v w w'
 
+namespace tactic.interactive
+open tactic
+
+meta def match_head (e : expr) : expr → tactic unit
+| e' :=
+    unify e e'
+<|> match e' with
+     | `(_ → %%e') :=
+     do v ← mk_mvar,
+        match_head (e'.instantiate_var v)
+     | _ := failed
+    end
+
+/-- `find_same_type t es` tries to find in es an expression with type definitionally equal to t -/
+meta def find_matching_head : expr → list expr → tactic expr
+| e []         := failed
+| e (H :: Hs) :=
+  do t ← infer_type H,
+     (match_head e t >> return H) <|> find_matching_head e Hs
+
+meta def xassumption : tactic unit :=
+do { ctx ← local_context,
+     t   ← target,
+     H   ← find_matching_head t ctx,
+     tactic.apply H }
+<|> fail "assumption tactic failed"
+
+example {a b : Prop} (h₀ : a → b) (h₁ : a) : b :=
+begin
+  xassumption,
+  xassumption,
+end
+
+example {α : Type} {p : α → Prop} (h₀ : ∀ x, p x) (y : α) : p y :=
+begin
+  xassumption,
+end
+
+end tactic.interactive
+
 open nat list (hiding bind) function
 
 @[reducible]
@@ -105,7 +145,7 @@ end
 lemma heap_mk_cons (p : pointer) (v : word) (vs : list word)
 :   heap.mk p (v :: vs)
   = part' (maplet p v) (heap.mk (p+1) vs) (maplet_disjoint_heap_mk p v vs) :=
-sorry
+by { funext x, simp [heap.mk,part'] }
 
 def left_combine (h₀ h₁ : heap) : heap
  | p := h₀ p <|> h₁ p
@@ -178,16 +218,28 @@ end
 lemma part'_disjoint {h₁ h₂ h₃ : heap}
   {H₀ : h₂ ## h₃}
   (H₁ : h₁ ## h₃)
-  (H₁ : h₁ ## h₂)
+  (H₂ : h₁ ## h₂)
 : part' h₂ h₃ ## h₁ :=
-sorry
+begin
+  intro p,
+  rw [or.comm,or_iff_not_imp,part',or_else_eq_none_iff],
+  intros H₃,
+  specialize H₁ p,
+  specialize H₂ p,
+  rw or_iff_not_imp at H₁ H₂,
+  split
+  ; xassumption
+  ; xassumption,
+end
 
 lemma disjoint_part' {h₁ h₂ h₃ : heap}
   {H₀ : h₂ ## h₃}
   (H₁ : h₁ ## h₃)
   (H₁ : h₁ ## h₂)
 : h₁ ## part' h₂ h₃ :=
-sorry
+by { apply disjoint_symm,
+     apply part'_disjoint
+     ; assumption }
 
 lemma disjoint_of_part'_disjoint_right {h₁ h₂ h₃ : heap}
   (H₁ : h₂ ## h₃)
@@ -216,13 +268,24 @@ lemma disjoint_of_disjoint_part'_right {h₁ h₂ h₃ : heap}
   (H₁ : h₂ ## h₃)
   (H₀ : h₁ ## part' h₂ h₃)
 : h₁ ## h₃ :=
-sorry
+begin
+  intro p,
+  rw or_iff_not_imp,
+  intro H₂,
+  specialize H₀ p,
+  rw or_iff_not_imp at H₀,
+  specialize H₀ H₂,
+  simp [part'] at H₀,
+  apply H₀.right,
+end
 
 lemma disjoint_of_disjoint_part'_left {h₁ h₂ h₃ : heap}
   (H₁ : h₂ ## h₃)
   (H₀ : h₁ ## part' h₂ h₃)
 : h₁ ## h₂ :=
-sorry
+by { apply disjoint_of_disjoint_part'_right,
+     rw part'_comm, apply H₀,
+     symmetry, apply H₁, }
 
 namespace tactic.interactive
 
@@ -314,13 +377,32 @@ by { funext p, simp [part'] }
 lemma delete_disjoint_delete {p : pointer} {n : ℕ} {hp₀ hp₁ : heap}
   (h : hp₀ ## hp₁)
 : heap.delete p n hp₀ ## heap.delete p n hp₁ :=
-sorry
+begin
+  revert p,
+  induction n with n ; intro p,
+  { intro q,
+    simp [heap.delete,h q], },
+  { intro q,
+    simp [heap.delete],
+    ite_cases,
+    apply ih_1, simp },
+end
 
 lemma delete_over_part' {p : pointer} {n : ℕ} {hp₀ hp₁ : heap}
   (h : hp₀ ## hp₁)
 :   heap.delete p n (part' hp₀ hp₁)
   = part' (heap.delete p n hp₀) (heap.delete p n hp₁) (delete_disjoint_delete h) :=
-sorry
+begin
+  revert p,
+  induction n with n ; intro p,
+  { funext q,
+    refl },
+  { funext q,
+    simp [heap.delete],
+    ite_cases,
+    { simp [ih_1,part',heap.delete,if_neg,h_1], },
+    { simp [part',heap.delete,if_pos,h_1], } }
+end
 
 lemma delete_part'_heap_mk {p : pointer} {vs : list word} {hp : heap}
   (h : heap.mk p vs ## hp)
