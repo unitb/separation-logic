@@ -3,6 +3,8 @@ import util.meta.tactic
 
 universes u
 
+namespace heap
+
 section classical
 
 local attribute [instance] classical.prop_decidable
@@ -35,8 +37,11 @@ lemma part_heap_emp
 : part (some hp) (some heap.emp) = some hp :=
 by simp [part]
 
+end heap
+
 namespace tactic.interactive
 
+open heap
 open tactic tactic.interactive (ite_cases)
 open lean lean.parser interactive interactive.types
 
@@ -49,64 +54,6 @@ meta def expand_part_ite : tactic unit :=
 do tactic.try `[ dsimp [part] ],
    tactic.reflexivity <|> try_then (ite_cases none $ loc.ns [none]) expand_part_ite
 
-meta def break_disjoint_asm_symm (l : expr)
-: tactic unit :=
-do t ← infer_type l,
-   match t with
-    | `(%%h₀ ## (%%h₁ : heap)) :=
-      do h ← get_unused_name `h,
-         to_expr ``(disjoint_symm %%l) >>= note h none,
-         return ()
-    | _ :=
-         fail $ format! "expecting {l} of the form _ ## _"
-   end
-
-meta def break_disjoint_asm_r (l : expr)
-: tactic (list expr) :=
-do t ← infer_type l,
-   match t with
-    | `(%%h₀ ## part' %%h₁ %%h₂ %%h₃) :=
-      do h ← get_unused_name `h,
-         r ← to_expr ``(disjoint_of_disjoint_part'_right _ %%l) >>= note h none,
-         h ← get_unused_name `h,
-         r' ← to_expr ``(disjoint_of_disjoint_part'_left _ %%l) >>= note h none,
-         try (tactic.clear l),
-         return [r,r']
-    | _ :=
-         fail $ format! "expecting {l} of the form _ ## _"
-   end
-meta def break_disjoint_asm_l (l : expr)
-: tactic (list expr) :=
-do t ← infer_type l,
-   match t with
-    | `(part' %%h₁ %%h₂ %%h₃ ## %%h₀) :=
-      do h ← get_unused_name `h,
-         r ← to_expr ``(disjoint_of_part'_disjoint_right _ %%l) >>= note h none,
-         h ← get_unused_name `h,
-         r' ← to_expr ``(disjoint_of_part'_disjoint_left _ %%l) >>= note h none,
-         try (tactic.clear l),
-         return [r,r']
-    | _ :=
-         break_disjoint_asm_r l
-   end
-
-meta def break_disjoint_asm'
-: expr → tactic unit
-| l :=
-do xs ← break_disjoint_asm_l l,
-   xs.for_each (try ∘ break_disjoint_asm')
-
-meta def break_disjoint_asm (l : parse ident)
-: tactic (list expr) :=
-do get_local l >>= break_disjoint_asm_l
-
-meta def break_disjoint_asms
-: tactic unit :=
-do ls ← local_context,
-   ls.for_each (try ∘ break_disjoint_asm'),
-   ls ← local_context,
-   ls.for_each (try ∘ break_disjoint_asm_symm)
-
 meta def contradict_asm
 : tactic unit :=
 do ls ← local_context,
@@ -114,20 +61,9 @@ do ls ← local_context,
      do `(¬ %%t) ← infer_type e | failed ,
          exfalso, tactic.apply e, tactic.clear e)
 
-meta def prove_disjoint'
-: tactic unit :=
-    assumption
-<|> (`[ apply part'_disjoint ] ; assumption )
-<|> (`[ apply disjoint_part' ] ; assumption )
-<|> failed
-
-meta def prove_disjoint
-: tactic unit :=
-do contradict_asm,
-   break_disjoint_asms,
-   prove_disjoint'
-
 end tactic.interactive
+
+namespace heap
 
 lemma part_assoc
   (a b c : option heap)
@@ -135,7 +71,7 @@ lemma part_assoc
 begin
   cases a ; cases b ; cases c
   ; expand_part_ite,
-   all_goals { prove_disjoint <|> rw part'_assoc },
+   all_goals { {contradict_asm ; prove_disjoint} <|> rw part'_assoc },
 end
 
 lemma part_comm
@@ -294,3 +230,5 @@ begin
     simp },
   { simp [part', heap.delete, maplet, if_neg, h] }
 end
+
+end heap

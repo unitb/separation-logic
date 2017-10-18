@@ -17,7 +17,7 @@ universes u v w w'
 open nat list function
 
 namespace separation
-
+open heap
 structure hprop :=
   (apply : heap → Prop)
 

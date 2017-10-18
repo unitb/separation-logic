@@ -23,6 +23,8 @@ instance : has_add word := ⟨ λ x y, ⟨ x.to_ptr + y.to_ptr ⟩ ⟩
 
 def heap := pointer → option word
 
+namespace heap
+
 def disjoint (h₀ h₁ : heap) :=
 (∀ p, h₀ p = none ∨ h₁ p = none)
 
@@ -35,7 +37,7 @@ def maplet (p : pointer) (v : word) : heap
   | q :=
 if p = q then some v else none
 
-def heap.emp : heap :=
+protected def emp : heap :=
 λ _, none
 
 @[simp]
@@ -66,22 +68,53 @@ begin
   cases (h x) ; simp [heap.emp,has_orelse.orelse,option.orelse]
 end
 
-def heap.mk : pointer → list word → heap
+protected def mk : pointer → list word → heap
 | _ [] := heap.emp
-| p (v :: vs) := λ q, maplet p v q <|> heap.mk (p+1) vs q
+| p (v :: vs) := λ q, maplet p v q <|> mk (p+1) vs q
+
+lemma maplet_disjoint_heap_mk_of_lt {p q : pointer} (v : word) (vs : list word)
+  (h : p < q)
+: disjoint (maplet p v) (heap.mk q vs) :=
+begin
+  revert q v,
+  induction vs with v vs ; intros q v h,
+  { apply disjoint_heap_emp },
+  { simp [(##)], intro ptr,
+    simp_intros h₁ [or_iff_not_imp,heap.mk],
+    split,
+    { simp [maplet] at ⊢ h₁,
+      ite_cases with h₀ at h₁ ⊢,
+      { contradiction },
+      rw [← h₀,if_neg],
+      apply ne_of_gt, apply h  },
+    { revert h₁, rw ← or_iff_not_imp,
+      apply ih_1,
+      transitivity q, assumption,
+      apply lt_add_of_pos_right,
+      apply zero_lt_one, } }
+end
 
 lemma maplet_disjoint_heap_mk (p : pointer) (v : word) (vs : list word)
-: disjoint (maplet p v) (heap.mk (p + 1) vs) :=
+: maplet p v ## heap.mk (p + 1) vs :=
+begin
+  apply maplet_disjoint_heap_mk_of_lt,
+  apply lt_add_of_pos_right,
+  apply zero_lt_one,
+end
+
+lemma heap_mk_cons (p : pointer) (v : word) (vs : list word)
+:   heap.mk p (v :: vs)
+  = part' (maplet p v) (heap.mk (p+1) vs) (maplet_disjoint_heap_mk p v vs) :=
 sorry
 
 def left_combine (h₀ h₁ : heap) : heap
  | p := h₀ p <|> h₁ p
 
-def heap.delete : pointer → ℕ → heap → heap
+protected def delete : pointer → ℕ → heap → heap
  | p 0 h q := h q
  | p (succ n) h q :=
 if p = q then none
-else heap.delete (p+1) n h q
+else delete (p+1) n h q
 
 infix ` <+ `:54 := left_combine
 
@@ -129,20 +162,18 @@ end
 lemma eq_emp_of_part' (hp a : heap)
   (h  : a ## hp)
 : a = part' a hp ↔ hp = heap.emp :=
-sorry
-
-lemma part'_assoc {h₀ h₁ h₂ : heap}
-  (Hdisj₀ : h₀ ## h₁)
-  (Hdisj₁ : h₁ ## h₂)
-  (Hdisj₂ : part' h₀ h₁ ## h₂)
-  (Hdisj₃ : h₀ ## part' h₁ h₂)
-: part' (part' h₀ h₁) h₂ Hdisj₂ = part' h₀ (part' h₁ h₂) Hdisj₃ :=
-sorry
-
-lemma delete_part'_heap_mk {p : pointer} {vs : list word} {hp : heap}
-  (h : heap.mk p vs ## hp)
-: heap.delete p (length vs) (part' (heap.mk p vs) hp) = hp :=
-sorry
+begin
+  split ; intro h₀,
+  { funext k,
+    have h₁ : a k = part' a hp h k,
+    { rw ← h₀, },
+    clear h₀,
+    dsimp [part',heap.emp,heap.disjoint] at *,
+    specialize h k,
+    cases h with h₂ h₂ ; simp [h₂] at h₁,
+    rw h₁, rw h₂, },
+  { simp [h₀], }
+end
 
 lemma part'_disjoint {h₁ h₂ h₃ : heap}
   {H₀ : h₂ ## h₃}
@@ -161,7 +192,7 @@ sorry
 lemma disjoint_of_part'_disjoint_right {h₁ h₂ h₃ : heap}
   (H₁ : h₂ ## h₃)
   (H₀ : part' h₂ h₃ ## h₁)
-: h₁ ## h₃ :=
+: h₃ ## h₁ :=
 begin
   intro p,
   cases H₀ p with H₂ H₂,
@@ -174,7 +205,7 @@ end
 lemma disjoint_of_part'_disjoint_left {h₁ h₂ h₃ : heap}
   (H₁ : h₂ ## h₃)
   (H₀ : part' h₂ h₃ ## h₁)
-: h₁ ## h₂ :=
+: h₂ ## h₁ :=
 begin
   have H₁ := disjoint_symm H₁,
   apply disjoint_of_part'_disjoint_right H₁,
@@ -193,7 +224,129 @@ lemma disjoint_of_disjoint_part'_left {h₁ h₂ h₃ : heap}
 : h₁ ## h₂ :=
 sorry
 
-def heap.insert (hp : heap) (p : pointer) (v : word) : heap
+namespace tactic.interactive
+
+open heap
+open tactic tactic.interactive (ite_cases)
+open lean lean.parser interactive interactive.types
+
+meta def break_disjoint_asm_symm (l : expr)
+: tactic unit :=
+do t ← infer_type l,
+   match t with
+    | `(%%h₀ ## (%%h₁ : heap)) :=
+      do h ← get_unused_name `h,
+         to_expr ``(disjoint_symm %%l) >>= note h none,
+         return ()
+    | _ :=
+         fail $ format! "expecting {l} of the form _ ## _"
+   end
+
+meta def break_disjoint_asm_r (l : expr)
+: tactic (list expr) :=
+do t ← infer_type l,
+   match t with
+    | `(%%h₀ ## part' %%h₁ %%h₂ %%h₃) :=
+      do h ← get_unused_name `h,
+         r ← to_expr ``(disjoint_of_disjoint_part'_right _ %%l) >>= note h none,
+         h ← get_unused_name `h,
+         r' ← to_expr ``(disjoint_of_disjoint_part'_left _ %%l) >>= note h none,
+         try (tactic.clear l),
+         return [r,r']
+    | _ :=
+         fail $ format! "expecting {l} of the form _ ## _"
+   end
+meta def break_disjoint_asm_l (l : expr)
+: tactic (list expr) :=
+do t ← infer_type l,
+   match t with
+    | `(part' %%h₁ %%h₂ %%h₃ ## %%h₀) :=
+      do h ← get_unused_name `h,
+         r ← to_expr ``(disjoint_of_part'_disjoint_right _ %%l) >>= note h none,
+         h ← get_unused_name `h,
+         r' ← to_expr ``(disjoint_of_part'_disjoint_left _ %%l) >>= note h none,
+         try (tactic.clear l),
+         return [r,r']
+    | _ :=
+         break_disjoint_asm_r l
+   end
+
+meta def break_disjoint_asm'
+: expr → tactic unit
+| l :=
+do xs ← break_disjoint_asm_l l,
+   xs.for_each (try ∘ break_disjoint_asm')
+
+meta def break_disjoint_asm (l : parse ident)
+: tactic (list expr) :=
+do get_local l >>= break_disjoint_asm_l
+
+meta def break_disjoint_asms
+: tactic unit :=
+do ls ← local_context,
+   ls.for_each (try ∘ break_disjoint_asm'),
+   ls ← local_context,
+   ls.for_each (try ∘ break_disjoint_asm_symm)
+
+meta def prove_disjoint'
+: tactic unit :=
+    assumption
+<|> (`[ apply part'_disjoint ] ; assumption )
+<|> (`[ apply disjoint_part' ] ; assumption )
+<|> failed
+
+meta def prove_disjoint
+: tactic unit :=
+do break_disjoint_asms,
+   prove_disjoint'
+
+run_cmd add_interactive [`prove_disjoint]
+
+end tactic.interactive
+
+lemma part'_assoc {h₀ h₁ h₂ : heap}
+  (Hdisj₀ : h₀ ## h₁)
+  (Hdisj₂ : part' h₀ h₁ ## h₂)
+: part' (part' h₀ h₁) h₂ Hdisj₂ = part' h₀ (part' h₁ h₂
+     (by prove_disjoint)) (by prove_disjoint) :=
+by { funext p, simp [part'] }
+
+lemma delete_disjoint_delete {p : pointer} {n : ℕ} {hp₀ hp₁ : heap}
+  (h : hp₀ ## hp₁)
+: heap.delete p n hp₀ ## heap.delete p n hp₁ :=
+sorry
+
+lemma delete_over_part' {p : pointer} {n : ℕ} {hp₀ hp₁ : heap}
+  (h : hp₀ ## hp₁)
+:   heap.delete p n (part' hp₀ hp₁)
+  = part' (heap.delete p n hp₀) (heap.delete p n hp₁) (delete_disjoint_delete h) :=
+sorry
+
+lemma delete_part'_heap_mk {p : pointer} {vs : list word} {hp : heap}
+  (h : heap.mk p vs ## hp)
+: heap.delete p (length vs) (part' (heap.mk p vs) hp) = hp :=
+begin
+  revert p,
+  induction vs with v vs
+  ; intros p h₀,
+  { simp [heap.delete,heap.mk], funext q, refl },
+  { funext q,
+    simp [length,add_one,heap.delete],
+    ite_cases,
+    { simp [heap_mk_cons],
+      have h₁ : heap.mk (p + 1) vs ## hp, admit,
+      have h₂ : heap.delete (succ p) (length vs) (maplet p v) = maplet p v,
+      { admit },
+      simp [part'_assoc,delete_over_part',ih_1 h₁,h₂,part',maplet,if_neg,h], },
+  { have h₁ : maplet p v ## hp,
+    { rw heap_mk_cons at h₀, prove_disjoint },
+    simp [(##)] at h₁,
+    specialize h₁ q, rw [or_comm,or_iff_not_imp] at h₁,
+    symmetry, apply h₁,
+    simp [maplet,if_pos,h], contradiction }, }
+end
+
+protected def insert (hp : heap) (p : pointer) (v : word) : heap
  | q := if p = q then some v else hp q
 
 lemma part'_insert (hp hp' : heap) (p : pointer) (v : word)
@@ -205,3 +358,5 @@ sorry
 lemma maplet_insert_disjoint_iff (p : pointer) (v v' : word) (hp : heap)
 : (maplet p v).insert p v' ## hp ↔ maplet p v ## hp :=
 sorry
+
+end heap
