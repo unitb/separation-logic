@@ -1,5 +1,5 @@
 import separation.heap
-import util.meta.tactic.ite
+import util.meta.tactic
 
 universes u
 

@@ -6,7 +6,6 @@ import util.control.applicative
 import util.control.monad.non_termination
 import util.data.option
 import util.meta.tactic
-import util.meta.tactic.perm
 
 universes u v w w'
 
