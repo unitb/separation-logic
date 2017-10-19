@@ -9,46 +9,6 @@ import util.meta.tactic
 
 universes u v w w'
 
-namespace tactic.interactive
-open tactic
-
-meta def match_head (e : expr) : expr → tactic unit
-| e' :=
-    unify e e'
-<|> match e' with
-     | `(_ → %%e') :=
-     do v ← mk_mvar,
-        match_head (e'.instantiate_var v)
-     | _ := failed
-    end
-
-/-- `find_same_type t es` tries to find in es an expression with type definitionally equal to t -/
-meta def find_matching_head : expr → list expr → tactic expr
-| e []         := failed
-| e (H :: Hs) :=
-  do t ← infer_type H,
-     (match_head e t >> return H) <|> find_matching_head e Hs
-
-meta def xassumption : tactic unit :=
-do { ctx ← local_context,
-     t   ← target,
-     H   ← find_matching_head t ctx,
-     tactic.apply H }
-<|> fail "assumption tactic failed"
-
-example {a b : Prop} (h₀ : a → b) (h₁ : a) : b :=
-begin
-  xassumption,
-  xassumption,
-end
-
-example {α : Type} {p : α → Prop} (h₀ : ∀ x, p x) (y : α) : p y :=
-begin
-  xassumption,
-end
-
-end tactic.interactive
-
 open nat list (hiding bind) function
 
 @[reducible]
