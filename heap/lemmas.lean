@@ -1,44 +1,11 @@
-import data.bitvec
-import data.dlist
-import data.list.perm
-import util.logic
-import util.control.applicative
-import util.control.monad.non_termination
-import util.data.option
+
 import util.meta.tactic
 
-universes u v w w'
-
-open nat list (hiding bind) function
-
-@[reducible]
-def pointer := ℕ
-
-structure word :=
-to_word :: (to_ptr : ℕ)
-
-instance : has_zero word := ⟨ ⟨ 0 ⟩ ⟩
-instance : has_one word := ⟨ ⟨ 1 ⟩ ⟩
-instance : has_add word := ⟨ λ x y, ⟨ x.to_ptr + y.to_ptr ⟩ ⟩
-
-def heap := pointer → option word
+import separation.heap.basic
 
 namespace heap
 
-def disjoint (h₀ h₁ : heap) :=
-(∀ p, h₀ p = none ∨ h₁ p = none)
-
-infix ` ## `:51 := disjoint
-
-def part'  (h₀ h₁ : heap) (_ : h₀ ## h₁ . tactic.assumption) : heap
- | p := h₀ p <|> h₁ p
-
-def maplet (p : pointer) (v : word) : heap
-  | q :=
-if p = q then some v else none
-
-protected def emp : heap :=
-λ _, none
+open nat list (hiding bind)
 
 @[simp]
 lemma heap_emp_disjoint (h : heap)
@@ -67,10 +34,6 @@ begin
   unfold part',
   cases (h x) ; simp [heap.emp,has_orelse.orelse,option.orelse]
 end
-
-protected def mk : pointer → list word → heap
-| _ [] := heap.emp
-| p (v :: vs) := λ q, maplet p v q <|> mk (p+1) vs q
 
 lemma maplet_disjoint_heap_mk_of_lt {p q : pointer} (v : word) (vs : list word)
   (h : p < q)
@@ -106,17 +69,6 @@ lemma heap_mk_cons (p : pointer) (v : word) (vs : list word)
 :   heap.mk p (v :: vs)
   = part' (maplet p v) (heap.mk (p+1) vs) (maplet_disjoint_heap_mk p v vs) :=
 by { funext x, simp [heap.mk,part'] }
-
-def left_combine (h₀ h₁ : heap) : heap
- | p := h₀ p <|> h₁ p
-
-protected def delete : pointer → ℕ → heap → heap
- | p 0 h q := h q
- | p (succ n) h q :=
-if p = q then none
-else delete (p+1) n h q
-
-infix ` <+ `:54 := left_combine
 
 @[symm]
 lemma disjoint_symm {h₀ h₁ : heap}
@@ -413,9 +365,6 @@ begin
     simp [maplet,if_pos,h], contradiction }, }
 end
 
-protected def insert (hp : heap) (p : pointer) (v : word) : heap
- | q := if p = q then some v else hp q
-
 lemma part'_insert (hp hp' : heap) (p : pointer) (v : word)
   (h₀ : hp.insert p v ## hp')
   (h₁ : hp ## hp')
@@ -438,6 +387,179 @@ begin
   apply or_congr,
   refl,
   split ; intro ; contradiction
+end
+
+@[simp]
+lemma some_part'
+  (hp₀ hp₁ : heap)
+  (h : hp₀ ## hp₁)
+: some (part' hp₀ hp₁) = part (some hp₀) (some hp₁) :=
+by { simp [part,bind,option.bind,dif_pos, h], }
+
+@[simp]
+lemma heap_emp_part
+  (hp : heap)
+: part (some heap.emp) (some hp) = some hp :=
+by simp [part]
+
+@[simp]
+lemma part_heap_emp
+  (hp : heap)
+: part (some hp) (some heap.emp) = some hp :=
+by simp [part]
+
+end heap
+
+namespace tactic.interactive
+
+open heap
+open tactic tactic.interactive (ite_cases)
+open lean lean.parser interactive interactive.types
+
+meta def try_then (x y : tactic unit) : tactic unit :=
+focus1 $
+do (some ()) ← try_core x | tactic.skip,
+   tactic.all_goals y
+
+meta def expand_part_ite : tactic unit :=
+do tactic.try `[ dsimp [part] ],
+   tactic.reflexivity <|> try_then (ite_cases none $ loc.ns [none]) expand_part_ite
+
+meta def contradict_asm
+: tactic unit :=
+do ls ← local_context,
+   ls.any_of (λ e,
+     do `(¬ %%t) ← infer_type e | failed ,
+         exfalso, tactic.apply e, tactic.clear e)
+
+end tactic.interactive
+
+namespace heap
+
+lemma part_assoc
+  (a b c : option heap)
+: part (part a b) c = part a (part b c) :=
+begin
+  cases a ; cases b ; cases c
+  ; expand_part_ite,
+   all_goals { {contradict_asm ; prove_disjoint} <|> rw part'_assoc },
+end
+
+lemma part_comm
+  (a b : option heap)
+: part a b = part b a :=
+begin
+  cases a ; cases b
+  ; dsimp [part] ; try { refl }
+  ; ite_cases with i
+  ; ite_cases with i'
+  ; try { contradict_asm, symmetry, assumption },
+  rw part'_comm,
+end
+
+instance : is_associative (option heap) part :=
+⟨ part_assoc ⟩
+instance : is_commutative (option heap) part :=
+⟨ part_comm ⟩
+
+lemma disjoint_of_is_some_part
+  {hp₀ hp₁ : heap}
+  (h : (part (some hp₀) (some hp₁)).is_some)
+: hp₀ ## hp₁ :=
+by { dsimp [part] at h,
+     ite_cases with h at h,
+     contradiction,
+     assumption }
+
+lemma disjoint_of_part_eq_some
+  {hp₀ hp₁ hp₂ : heap}
+  (h : some hp₂ = (part (some hp₀) (some hp₁)))
+: hp₀ ## hp₁ :=
+by { apply disjoint_of_is_some_part, rw ← h, exact rfl }
+
+lemma eq_part'_of_some_eq_part
+  (hp₀ hp₁ hp : heap)
+  (h : some hp = part (some hp₀) (some hp₁))
+: hp = part' hp₀ hp₁ (disjoint_of_part_eq_some h) :=
+by { apply @option.no_confusion _ _ (some hp) (some _) _ id,
+     simp [h], }
+
+lemma is_some_of_is_some_part_right
+  (hp₀ : option heap) {hp₁ : option heap}
+  (h : (part hp₀ hp₁).is_some)
+: hp₁.is_some :=
+by { cases hp₀ ; cases hp₁ ; try { contradiction },
+     exact rfl }
+
+lemma is_some_of_is_some_part_left
+  {hp₀ : option heap} (hp₁ : option heap)
+  (h : (part hp₀ hp₁).is_some)
+: hp₀.is_some :=
+by { cases hp₀ ; cases hp₁ ; try { contradiction },
+     exact rfl }
+
+@[simp]
+lemma some_eq_some_iff (x y : heap)
+: some x = some y ↔ x = y :=
+by { split ; intro h, injection h, subst x }
+
+def opt_apl : option heap → pointer → option word
+ | (some hp) p := hp p
+ | none _ := none
+
+lemma opt_apl_some (hp : heap) (p : pointer)
+: opt_apl (some hp) p = hp p :=
+rfl
+
+lemma opt_apl_part_maplet (hp : heap) (p : pointer) (v : word)
+  (h : maplet p v ## hp)
+: (opt_apl (part (some (maplet p v)) (some hp)) p) = some v :=
+begin
+  unfold part,
+  rw [dif_pos] ; [ skip , apply h ],
+  rw [opt_apl,part',maplet,if_pos rfl],
+  refl,
+end
+
+@[simp]
+lemma eq_emp_of_part (a : heap) (hp : option heap)
+: some a = part (some a) hp ↔ hp = some heap.emp :=
+begin
+  cases hp ; dsimp [part],
+  split ; intro h ; contradiction,
+  ite_cases with h₀,
+  split ; intros h₁,
+  { contradiction },
+  { injection h₁ with h₂, simp [h₂] at h₀,
+    cases h₀, },
+  split ; intro h₁ ; injection h₁ with h₂,
+  { simp [eq_emp_of_part'] at h₂,
+    simp [h₂] },
+  { simp [h₂], }
+end
+
+@[simp]
+lemma part'_eq_emp (a b : option heap)
+: part a b = some heap.emp ↔ a = some heap.emp ∧ b = some heap.emp :=
+begin
+  split ; simp_intros h ;
+  cases a ; cases b
+  ; try { refl }
+  ; try { cases h with h₀ h₁ }
+  ; try { contradiction }
+  ; try { rw [h₀,h₁,← some_part' _ _ (disjoint_heap_emp _)
+             ,heap_emp_part'_eq_self] },
+  { unfold part at h,
+    revert h, ite_cases with h,
+    contradiction,
+    intro h₀,
+    injection h₀ with h₁,
+    have h₂ : ∀ p, part' a a_1 h p = heap.emp p,
+    { intro, rw h₁ },
+    simp [part',heap.emp] at h₂,
+    split ; congr ; funext p,
+    { simp [(h₂ p).left], refl },
+    { simp [(h₂ p).right], refl }, }
 end
 
 end heap

@@ -7,7 +7,6 @@ import util.control.monad.non_termination
 import util.control.monad.state
 import util.meta.tactic
 import separation.heap
-import separation.heap2
 import separation.program
 
 import logic.basic
