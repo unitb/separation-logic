@@ -1,5 +1,5 @@
 [package]
-name = "modexp"
+name = "separation-logic"
 version = "0.1"
 lean_version = "master"
 path = "src"
