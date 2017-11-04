@@ -164,9 +164,9 @@ fix2 (λ list_reverse_dup_aux p q,
 if p = 0 then return q
 else do
   x  ← read_nth p 0 2,
-  q' ← alloc [x,⟨ q ⟩],
-  p' ← read_nth p 1 2,
-  list_reverse_dup_aux p'.to_ptr q')
+  new  ← alloc [x,⟨ q ⟩],
+  next ← read_nth p 1 2,
+  list_reverse_dup_aux next.to_ptr new)
 
 lemma list_reverse_dup_aux_def (p q : pointer)
 : list_reverse_dup_aux p q =
@@ -224,9 +224,10 @@ begin
     -- apply s_exists_replace_pre word.to_word word.to_ptr,
     -- { intro, cases x, refl },
     -- have HH := (ih_1 (xs ++ [y]) (y :: zs) _),
-
+    clear_except HH h₁,
     apply framing_spec' _ HH,
-    { simp [segment_append,is_list],
+    { monotonicity1,
+      simp [segment_append,is_list],
       simp [s_exists_s_and_distr,s_and_s_exists_distr],
       apply s_exists_intro (word.to_word r),
       apply s_exists_intro,

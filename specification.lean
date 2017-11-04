@@ -283,8 +283,49 @@ lemma s_and_s_exists_distr {α : Type u}
 : q :*: (∃∃ x, p x) = (∃∃ x, q :*: p x) :=
 begin
   rw [s_and_comm,s_exists_s_and_distr], congr,
-  funext hp, ac_refl
+  funext hp, apply s_and_comm,
 end
+
+lemma s_and_s_imp_s_and
+  {p q r s : hprop}
+  (h₀ : p =*> r)
+  (h₁ : q =*> s)
+: p :*: q =*> r :*: s :=
+begin
+  unfold h_imp s_and hprop.apply,
+  simp_intros hp, intros hp_p Hp hp_q Hq Hpq,
+  existsi [hp_p,h₀ _ Hp,hp_q,h₁ _ Hq],
+  assumption
+end
+
+lemma s_and_s_imp_s_and_left
+  (p : hprop) {q s : hprop}
+  (h₁ : q =*> s)
+: p :*: q =*> p :*: s :=
+by { apply s_and_s_imp_s_and _ h₁, refl }
+
+@[monotonic]
+lemma s_and_s_imp_s_and_right
+  {p : hprop} (q : hprop) {r : hprop}
+  (h₀ : p =*> r)
+: p :*: q =*> r :*: q :=
+by { apply s_and_s_imp_s_and h₀, refl }
+
+instance : comm_monoid hprop :=
+{ mul := s_and
+, one := emp
+, mul_one := by { intros, simp [has_mul.mul] }
+, one_mul := by { intros, simp [has_mul.mul] }
+, mul_assoc := by { intros, simp [s_and_assoc] }
+, mul_comm := by { intros, apply s_and_comm, } }
+
+-- -- @[priority 1000]
+-- instance : is_left_id hprop s_and emp :=
+-- show is_left_id hprop has_mul.mul 1, by apply_instance
+
+-- -- @[priority 1000]
+-- instance : is_right_id hprop s_and emp :=
+-- show is_right_id hprop has_mul.mul 1, by apply_instance
 
 section
 

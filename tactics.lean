@@ -2,6 +2,8 @@
 import data.dlist
 import separation.specification
 
+import util.meta.tactic
+
 universes u v
 
 namespace tactic.interactive
@@ -32,23 +34,6 @@ meta def parse_sep_assert' : expr → tactic (dlist expr)
 meta def parse_sep_assert : expr → tactic (list expr) :=
 map dlist.to_list ∘ parse_sep_assert'
 
-meta def is_mvar : expr → bool
- | (expr.mvar _ _ _) := tt
- | _ := ff
-
-meta def compare (unif : bool) (e₀ e₁ : expr) : tactic unit := do
-if unif then do
-guard (¬ is_mvar e₀ ∧ ¬ is_mvar e₁),
-unify e₀ e₁
-else is_def_eq e₀ e₁
-
-meta def delete_expr (unif : bool) (e : expr) : list expr → tactic (option (list expr))
- | [] := return none
- | (x :: xs) :=
-(compare unif e x >> return (some xs))
-<|>
-(map (cons x) <$> delete_expr xs)
-
 meta def match_sep' (unif : bool)
 : list expr → list expr → tactic (list expr × list expr × list expr)
  | es (x :: xs) := do
@@ -62,13 +47,16 @@ meta def match_sep' (unif : bool)
  | es [] := do
 return ([],es,[])
 
+/--
+`(common,left,right) ← match_sep unif l r` finds the commonalities
+between `l` and `r` and returns the differences  -/
 meta def match_sep (unif : bool) (l : list expr) (r : list expr)
-: tactic (list expr × list expr × list expr) := do
-(s',l',r') ← match_sep' unif l r,
-s' ← mmap instantiate_mvars s',
-l' ← mmap instantiate_mvars l',
-r' ← mmap instantiate_mvars r',
-return (s',l',r')
+: tactic (list expr × list expr × list expr) :=
+do (s',l',r') ← match_sep' unif l r,
+   s' ← mmap instantiate_mvars s',
+   l' ← mmap instantiate_mvars l',
+   r' ← mmap instantiate_mvars r',
+   return (s',l',r')
 
 def expr_pat (t₀ t₁ : Type) : ℕ → Type
  | 0 := t₁
@@ -141,27 +129,28 @@ tactic.target >>= instantiate_mvars >>= tactic.change,
 try `[simp] >> ac_refl
 
 /-- apply on a goal of the form `sat p spec` -/
-meta def extract_context_aux (h : name) (subst_flag : bool) : tactic unit := do
-`[apply precondition _],
-swap,
-`[symmetry],
-solve1 (do
---  cxt ← mk_meta_var `(Prop),
-  (hp,pat,var) ← sep_goal,
-  to_expr ``( [| _ |] ) >>= unify pat,
-  e ← find_match pat hp [],
-  unify e var,
-  tactic.target >>= instantiate_mvars >>= tactic.change,
-  try `[simp],
-  try ac_refl),
-`[apply context_left],
-x ← tactic.intro h,
-when subst_flag $ try (tactic.subst x),
-return ()
+meta def extract_context_aux (h : name) (subst_flag : bool) : tactic unit :=
+do `[apply precondition _],
+   swap,
+  `[symmetry],
+   solve1 (do
+   --  cxt ← mk_meta_var `(Prop),
+     (hp,pat,var) ← sep_goal,
+     to_expr ``( [| _ |] ) >>= unify pat,
+     e ← find_match pat hp [],
+     unify e var,
+     tactic.target >>= instantiate_mvars >>= tactic.change,
+     try `[simp],
+     try ac_refl),
+   `[apply context_left],
+   x ← tactic.intro h,
+   when subst_flag $ try (tactic.subst x),
+   return ()
 
 meta def subst_flag := (tk "with" *> tk "subst" *> pure tt) <|> return ff
 
-meta def extract_context : parse ident* → ∀ (x : parse subst_flag), tactic unit
+meta def extract_context
+: parse ident* → ∀ (x : parse subst_flag), tactic unit
  | [] x := return ()
  | (h :: hs) x := extract_context_aux h x >> extract_context hs x
 
@@ -169,53 +158,61 @@ meta def match_sep_imp : expr → tactic (expr × expr)
  | `(%%e₀ =*> %%e₁) := return (e₀, e₁)
  | _ := fail "expression is not an sep implication"
 
-meta def intro_unit (v : parse ident_?) : tactic unit := do
-e ← match v with
-    | none := intro1
-    | (some v) := tactic.intro v
-    end,
-t ← infer_type e,
-if t = `(unit)
-then tactic.cases e
-else return ()
+meta def intro_unit (v : parse ident_?) : tactic unit :=
+do e ← match v with
+       | none := intro1
+       | (some v) := tactic.intro v
+       end,
+   t ← infer_type e,
+   if t = `(unit)
+   then tactic.cases e
+   else return ()
 
-meta def ac_match' : tactic unit := do
-abs ← attribute.get_instances `ptr_abstraction >>= mmap (map simp_arg_type.expr ∘ resolve_name),
--- try (unfold abs (loc.ns [none])),
--- try (simp tt [] [`separation.example.ptr_abstraction] (loc.ns [])),
-try (simp tt abs [] (loc.ns [none])),
-try `[simp [s_and_s_exists_distr,s_exists_s_and_distr] { fail_if_unchanged := ff }],
-repeat `[apply s_exists_elim, intro_unit],
-repeat `[apply s_exists_intro],
-trace "\nrewrite\n",
-trace_state,
-try (unfold_projs (loc.ns [])),
-done <|> focus1 (do
-  repeat `[rw [embed_eq_emp],
-           simp { fail_if_unchanged := ff } ],
-  all_goals (try assumption)),
-done <|> (do
-  solve1 (do
-    try `[apply s_imp_of_eq],
-    t ← target,
-    (e₀,e₁) ← match_eq t,
-    e₀ ← parse_sep_assert e₀,
-    e₁ ← parse_sep_assert e₁,
-    (c,l,r) ← match_sep ff e₀ e₁,
-    (c',l',r') ← match_sep tt l r,
-    (c'',l',r') ← match_sep tt l' r',
-    let ll := l'.length,
-    let rl := r'.length,
-    let l'' := l' ++ list.repeat `(emp) (rl - ll),
-    h ← assert `h `(%%(mk_sep_assert l'') = (%%(mk_sep_assert r') : hprop)),
-    solve1 tactic.reflexivity,
-    target >>= instantiate_mvars >>= tactic.change,
-    try `[simp { fail_if_unchanged := ff }],
-    try `[rw s_and_comm, try { refl }],
-    try ac_refl))
+meta def ac_match' : tactic unit :=
+do abs ← attribute.get_instances `ptr_abstraction
+           >>= mmap (map simp_arg_type.expr ∘ resolve_name),
+   -- try (unfold abs (loc.ns [none])),
+   -- try (simp tt [] [`separation.example.ptr_abstraction] (loc.ns [])),
+   try (simp tt abs [] (loc.ns [none])),
+   try `[simp [s_and_s_exists_distr,s_exists_s_and_distr]
+       { fail_if_unchanged := ff }],
+   repeat `[apply s_exists_elim, intro_unit],
+   repeat `[apply s_exists_intro],
+   trace "\nrewrite\n",
+   trace_state,
+   try (unfold_projs (loc.ns [])),
+   done <|> focus1 (do
+     repeat `[rw [embed_eq_emp],
+     simp { fail_if_unchanged := ff } ],
+     all_goals (try assumption)),
+   done <|> (do
+     solve1 (do
+       try `[apply s_imp_of_eq],
+       t ← target,
+       (e₀,e₁) ← match_eq t,
+       e₀ ← parse_sep_assert e₀,
+       e₁ ← parse_sep_assert e₁,
+       (c,l,r) ← match_sep ff e₀ e₁,
+       (c',l',r') ← match_sep tt l r,
+       (c'',l',r') ← match_sep tt l' r',
+       let ll := l'.length,
+       let rl := r'.length,
+       let l'' := l' ++ list.repeat `(emp) (rl - ll),
+       h ← assert `h `(%%(mk_sep_assert l'') = (%%(mk_sep_assert r') : hprop)),
+       solve1 tactic.reflexivity,
+       target >>= instantiate_mvars >>= tactic.change,
+       try `[simp { fail_if_unchanged := ff }],
+       try `[rw s_and_comm, try { refl }],
+       try ac_refl))
 
 meta def ac_match : tactic unit := do
 ac_match'
+
+example (e₁ e₂ e₃ : hprop)
+: e₁ :*: e₂ :*: e₃ = e₂ :*: e₃ :*: e₁ :=
+begin
+  ac_match,
+end
 
 def replicate {m : Type u → Type v} [monad m] {α} : ℕ → m α → m (list α)
  | 0 _ := return []
@@ -304,5 +301,38 @@ solve1 (do
     ac_match,
     all_goals (try assumption)),
 all_goals (try `[apply of_as_true, apply trivial])
+
+-- meta def himp_zoom : tactic unit :=
+-- do `(%%lhs =*> %%rhs) ← target | failed,
+--    ls ← parse_sep_assert lhs,
+--    rs ← parse_sep_assert rhs,
+--    (s,l,r) ← match_sep ff ls rs,
+--    let s' := mk_sep_assert s,
+--    let lhs' := mk_sep_assert (l ++ s),
+--    let rhs' := mk_sep_assert (r ++ s),
+--    h   ← to_expr ``(%%(mk_sep_assert l) =*> %%(mk_sep_assert r))
+--       >>= assert `h,
+--    tactic.swap,
+--    prf ← to_expr ``(s_and_s_imp_s_and_right %%(mk_sep_assert s) %%h),
+--    note `h none prf,
+--    return ()
+
+example (e₁ e₂ e₃ e₄ e₅ e₆ : hprop)
+  (h : e₃ :*: e₁ :*: e₅ :*: e₄ =*> e₆)
+: e₃ :*: e₁ :*: e₅ :*: e₂ :*: e₄ =*> e₂ :*: e₆ :=
+begin
+  monotonicity1,
+  auto
+end
+
+-- set_option pp.implicit true
+-- set_option pp.notation false
+example (e₁ e₂ e₃ e₄ e₅ e₆ : hprop)
+  (h : e₁ :*: e₅ :*: e₄ =*> emp)
+: e₃ :*: e₁ :*: e₅ :*: e₂ :*: e₄ =*> e₂ :*: e₃ :=
+begin
+  monotonicity1,
+  auto
+end
 
 end tactic.interactive
