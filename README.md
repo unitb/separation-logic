@@ -1,3 +1,3 @@
-# lean-modexp
+# separation-logic
 
-Build: [![Build Status](https://travis-ci.org/cipher1024/lean-modexp.svg?branch=master)](https://travis-ci.org/cipher1024/lean-modexp)
+Build: [![Build Status](https://travis-ci.org/unitb/separation-logic.svg?branch=master)](https://travis-ci.org/unitb/separation-logic)
