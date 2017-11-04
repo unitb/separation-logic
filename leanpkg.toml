@@ -2,6 +2,7 @@
 name = "modexp"
 version = "0.1"
 lean_version = "master"
+path = "src"
 
 [dependencies]
 mathlib = {git = "https://github.com/leanprover/mathlib", rev = "5ad8020f67eb13896a41cc7691d072c9331b1f76"}
