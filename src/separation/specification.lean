@@ -193,8 +193,6 @@ begin
     existsi [hp_p,Hp,hp_q,Hq], simp },
 end
 
-instance : is_associative hprop s_and := ⟨ s_and_assoc ⟩
-instance : is_commutative hprop s_and := ⟨ s_and_comm ⟩
 
 lemma embed_s_and_embed (p q : Prop)
 : [| p |] :*: [| q |] = [| p ∧ q |] :=

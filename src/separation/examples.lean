@@ -36,7 +36,7 @@ begin
   bind_step,
   bind_step,
   bind_step,
-  last_step,
+  last_step',
 end
 
 open program
@@ -91,7 +91,7 @@ begin
     bind_step,
     bind_step with _ h,
     unfold replace nth_le at *,
-    last_step (ih_1 nx.to_ptr), }
+    last_step' (ih_1 nx.to_ptr), }
 end
 
 def list_reverse_aux : ∀ (p r : pointer),  program pointer :=
@@ -126,14 +126,14 @@ begin
   { simp [is_list],
     extract_context h,
     rw [list_reverse_aux_def,if_pos h],
-    last_step, },
+    last_step', },
   case cons x xs
   { simp [is_list],
     s_intros nx h,
     rw [list_reverse_aux_def,if_neg h],
     bind_step with p' h',
     bind_step, unfold replace const,
-    last_step (ih_1 (x :: ys)), }
+    last_step' (ih_1 (x :: ys)), }
 end
 
 def list_reverse (p : pointer) : program pointer :=
@@ -187,14 +187,20 @@ lemma segment_nil (p : pointer) (xs : list word)
 sorry
 
 @[ptr_abstraction]
-lemma segment_append (p q : pointer) (xs ys : list word)
-: segment p q (xs++ys) = ∃∃ r, segment p q xs :*: segment q r ys :=
+lemma segment_append (p r : pointer) (xs ys : list word)
+: segment p r (xs++ys) = ∃∃ q, segment p q xs :*: segment q r ys :=
 sorry
 
+@[ptr_abstraction]
 lemma segment_single (p q : pointer) (x : word)
 : segment p q [x] = p ↦* [x,⟨ q ⟩] :=
 sorry
 
+@[ptr_abstraction]
+lemma word_to_pointer_eq_self (x : word)
+: { word . to_ptr := x.to_ptr } = x := sorry
+
+open tactic
 lemma list_reverse_dup_aux_spec (p q r : pointer) (xs ys zs : list word)
 : sat (list_reverse_dup_aux q r)
       { pre := segment p q xs :*: is_list q ys :*: is_list r zs,
@@ -217,25 +223,7 @@ begin
     bind_step with x  h₀,
     bind_step with new h₁,
     bind_step with next h,
-    repeat { rw [← s_and_assoc] },
-    have HH := (ih_1 (xs ++ [x]) (x :: zs) next.to_ptr new),
-    -- last_step (ih_1 (xs ++ [y]) (y :: zs)),
-    -- apply s_exists_elim_pre nx,
-    -- apply s_exists_replace_pre word.to_word word.to_ptr,
-    -- { intro, cases x, refl },
-    -- have HH := (ih_1 (xs ++ [y]) (y :: zs) _),
-    clear_except HH h₁,
-    apply framing_spec' _ HH,
-    { monotonicity1,
-      simp [segment_append,is_list],
-      simp [s_exists_s_and_distr,s_and_s_exists_distr],
-      apply s_exists_intro (word.to_word r),
-      apply s_exists_intro,
-      simp [embed_eq_emp h₁],
-      -- ac_match',
-      -- apply s_imp_of_eq, simp [embed_eq_emp h₂,s_and_assoc],
-      admit, admit },
-    { intro, simp, rw [s_and_emp] }, },
+    last_step' ih_1 (xs ++ [x]) (x :: zs), }
 end
 
 def list_reverse_dup (p : pointer) : program pointer :=
@@ -306,7 +294,7 @@ begin
     bind_step with r hr,
     bind_step,
     bind_step ih_1,
-    last_step ih_2 }
+    last_step' ih_2 }
 end
 
 end examples
