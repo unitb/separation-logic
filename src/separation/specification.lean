@@ -430,12 +430,8 @@ lemma precondition' (p : hprop)
 : sat P { pre := q, post := r } :=
 begin
   revert Hspec, unfold sat,
-  apply forall_imp_forall _, intro σ,
-  apply forall_imp_forall _, intro hp₀,
-  apply forall_imp_forall _, intro hp₁,
-  apply forall_imp_forall _, intro,
-  intros h₀ h₁, apply h₀,
-  apply Hside _ h₁,
+  intros_mono σ hp₀ hp₁ h _,
+  apply Hside _ ,
 end
 
 lemma bind_framing_left (p₁ : hprop)
