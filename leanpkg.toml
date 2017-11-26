@@ -6,4 +6,4 @@ path = "src"
 
 [dependencies]
 mathlib = {git = "https://github.com/leanprover/mathlib", rev = "2c84af163dbc83c6eb6a94a03d5c25f25b6b8623"}
-lean-lib = {git = "https://github.com/unitb/lean-lib", rev = "07dd6edb0d0e60b080d470a438ceba3f044d8336"}
+lean-lib = {git = "https://github.com/unitb/lean-lib", rev = "01d3a96e419338abf361ad937fcec810ab30635f"}
