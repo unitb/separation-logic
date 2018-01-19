@@ -34,7 +34,7 @@ lemma part'_delete_maplet (p : pointer) (v : word) (hp : heap)
 : part' (heap.delete p 1 hp) (maplet p v) = hp :=
 begin
   funext p',
-  by_cases (p = p') with h,
+  by_cases h : (p = p'),
   { simp [part', heap.delete, maplet, if_pos, h],
     unfold has_le.le heap.le at h',
     cases h' with hp' h', cases hp' with hp',

@@ -32,11 +32,11 @@ meta inductive assert_with_vars
  | s_exists : expr → assert_with_vars → assert_with_vars
  | leaf : expr → assert_with_vars
  | prop : expr → assert_with_vars
-
+open predicate
 meta def parse_assert_with_vars : expr → tactic assert_with_vars
  | `(s_and %%e₀ %%e₁) := assert_with_vars.s_and <$> parse_assert_with_vars e₀
                                                 <*> parse_assert_with_vars e₁
- | `(hexists %%e) :=
+ | `(p_exists %%e) :=
    do `(λ _ : %%t, %%e') ← pure e,
       assert_with_vars.s_exists t <$> parse_assert_with_vars e'
  | `([| %%e |]) :=
@@ -47,7 +47,7 @@ meta def assert_with_vars.to_expr : assert_with_vars → pexpr
  | (assert_with_vars.leaf e) := to_pexpr e
  | (assert_with_vars.prop e) :=  ``([| %%e |])
  | (assert_with_vars.s_and e₀ e₁) := ``(%%(e₀.to_expr) :*: %%(e₁.to_expr))
- | (assert_with_vars.s_exists t e) := ``(hexists %%(expr.lam `x binder_info.default (to_pexpr t) e.to_expr))
+ | (assert_with_vars.s_exists t e) := ``(p_exists %%(expr.lam `x binder_info.default (to_pexpr t) e.to_expr))
 
 meta def hexists_to_meta_var (rules : list simp_arg_type)
 : list expr → assert_with_vars → tactic (assert_with_vars × expr)
@@ -215,7 +215,7 @@ do e ← match v with
        end,
    t ← infer_type e,
    if t = `(unit)
-   then tactic.cases e
+   then () <$ tactic.cases e
    else return ()
 
 meta def simp_ptr_abstr : tactic unit :=
@@ -228,7 +228,7 @@ do abs ← attribute.get_instances `ptr_abstraction,
 meta def ac_match' : tactic unit :=
 do abs ← attribute.get_instances `ptr_abstraction
            >>= mmap (map simp_arg_type.expr ∘ resolve_name),
-   try (simp tt abs [] (loc.ns [none])),
+   try (simp none tt abs [] (loc.ns [none])),
    try `[simp [s_and_s_exists_distr,s_exists_s_and_distr]
        { fail_if_unchanged := ff }],
    repeat `[apply s_exists_elim, intro_unit],
@@ -354,14 +354,11 @@ do `(%%p =*> %%q) ← target,
    (applyc `separation.s_imp_of_eq >> ac_match'),
    done,
    set_goals gs,
-   tactic.apply p' { new_goals := new_goals.non_dep_only }
+   () <$ tactic.apply p' { new_goals := new_goals.non_dep_only }
 
-meta def last_step' (spec : parse texpr?) : tactic unit :=
+meta def last_step' (s : parse texpr?) : tactic unit :=
 solve1 $
-do g ← target,
-   let s : option _ := spec,
-   (hd,spec) ← (match_expr 2 (λ e s, ``(sat %%e %%s)) g
-                : tactic (expr × expr)),
+do `(sat %%hd %%spec) ← target,
    let (cmd,args) := hd.get_app_fn_args,
    e ← (resolve_name (cmd.const_name <.> "spec") >>= to_expr) <| (to_expr <$> s),
    r ← to_expr ``(sat _ _),
@@ -376,14 +373,14 @@ do g ← target,
    simp_h_entails,
    all_goals (try $ `[apply of_as_true, apply trivial] <|> auto),
    done,
-
    set_goals [p₁],
    intro1,
    simp_h_entails,
    all_goals (try $ `[apply of_as_true, apply trivial] <|> auto),
    done,
    set_goals gs,
-   tactic.apply r
+   tactic.apply r,
+   return ()
 
 meta def last_step (spec : parse texpr?) : tactic unit :=
 do last_step' spec,

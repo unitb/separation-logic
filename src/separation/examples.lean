@@ -83,7 +83,7 @@ begin
     rw [map_list_def],
     simp [h],
     apply return.spec' },
-  case cons x xs
+  case cons : x xs
   { unfold map is_list,
     s_intros nx Hp_nz,
     rw [map_list_def],
@@ -91,7 +91,7 @@ begin
     bind_step,
     bind_step with _ h,
     unfold replace nth_le at *,
-    last_step' (ih_1 nx.to_ptr), }
+    last_step' (vs_ih nx.to_ptr), }
 end
 
 def list_reverse_aux : ∀ (p r : pointer),  program pointer :=
@@ -127,13 +127,13 @@ begin
     extract_context h,
     rw [list_reverse_aux_def,if_pos h],
     last_step', },
-  case cons x xs
+  case cons : x xs
   { simp [is_list],
     s_intros nx h,
     rw [list_reverse_aux_def,if_neg h],
     bind_step with p' h',
     bind_step, unfold replace const,
-    last_step' (ih_1 (x :: ys)), }
+    last_step' (xs_ih (x :: ys)), }
 end
 
 def list_reverse (p : pointer) : program pointer :=
@@ -215,7 +215,7 @@ begin
     subst q, simp [segment_nil],
     apply postcondition _ (return.spec _ _),
     { intros, dsimp [list.reverse_nil], ac_refl } },
-  case cons y ys
+  case cons : y ys
   { unfold is_list,
     extract_context h,
     s_exists nx,
@@ -223,7 +223,7 @@ begin
     bind_step with x  h₀,
     bind_step with new h₁,
     bind_step with next h,
-    last_step' ih_1 (xs ++ [x]) (x :: zs), }
+    last_step' ys_ih (xs ++ [x]) (x :: zs), }
 end
 
 def list_reverse_dup (p : pointer) : program pointer :=
@@ -286,15 +286,15 @@ begin
     s_intros h,
     simp [h],
     apply return.spec', },
-  case tree.node l x r
+  case tree.node : l x r
   { unfold is_tree,
     s_intros lp rp h,
     rw [free_tree_def,if_neg h],
     bind_step with l hl,
     bind_step with r hr,
     bind_step,
-    bind_step ih_1,
-    last_step' ih_2 }
+    bind_step t_ih_a,
+    last_step' t_ih_a_1 }
 end
 
 end examples

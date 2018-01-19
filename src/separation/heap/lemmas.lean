@@ -51,7 +51,7 @@ begin
       rw [← h₀,if_neg],
       apply ne_of_gt, apply h  },
     { revert h₁, rw ← or_iff_not_imp,
-      apply ih_1,
+      apply vs_ih,
       transitivity q, assumption,
       apply lt_add_of_pos_right,
       apply zero_lt_one, } }
@@ -297,7 +297,7 @@ begin
   { intro q,
     simp [heap.delete],
     ite_cases,
-    apply ih_1, simp },
+    apply n_ih, simp },
 end
 
 lemma delete_over_part' {p : pointer} {n : ℕ} {hp₀ hp₁ : heap}
@@ -312,7 +312,7 @@ begin
   { funext q,
     simp [heap.delete],
     ite_cases with h',
-    { simp [ih_1,part',heap.delete,if_neg,h'], },
+    { simp [n_ih,part',heap.delete,if_neg,h'], },
     { simp [part',heap.delete,if_pos,h'], } }
 end
 
@@ -324,7 +324,7 @@ begin
   revert q,
   induction k with k ; intros q h, refl,
   { simp [heap.delete],
-    ite_cases, apply @ih_1 (q + 1) _,
+    ite_cases, apply @k_ih (q + 1) _,
     { transitivity q, assumption,
       apply lt_succ_self },
     simp [maplet],
@@ -356,13 +356,13 @@ begin
         apply and.elim_right, },
       have h₂ : heap.delete (succ p) (length vs) (maplet p v) = maplet p v,
       { apply heap_delete_maplet, apply lt_succ_self, },
-      simp [part'_assoc,delete_over_part',ih_1 h₁,h₂,part',maplet,if_neg,h], },
+      simp [part'_assoc,delete_over_part',vs_ih h₁,h₂,part',maplet,if_neg,h], },
   { have h₁ : maplet p v ## hp,
     { rw heap_mk_cons at h₀, prove_disjoint },
     simp [(##)] at h₁,
-    specialize h₁ q, rw [or_comm,or_iff_not_imp] at h₁,
+    specialize h₁ q, rw [or_iff_not_imp] at h₁,
     symmetry, apply h₁,
-    simp [maplet,if_pos,h], contradiction }, }
+    simp [maplet,if_pos,h] }, }
 end
 
 lemma part'_insert (hp hp' : heap) (p : pointer) (v : word)
@@ -384,9 +384,6 @@ begin
   intro p',
   ite_cases,
   simp [maplet,if_pos,h],
-  apply or_congr,
-  refl,
-  split ; intro ; contradiction
 end
 
 @[simp]
@@ -554,12 +551,31 @@ begin
     contradiction,
     intro h₀,
     injection h₀ with h₁,
-    have h₂ : ∀ p, part' a a_1 h p = heap.emp p,
+    have h₂ : ∀ p, part' a b h p = heap.emp p,
     { intro, rw h₁ },
     simp [part',heap.emp] at h₂,
     split ; congr ; funext p,
     { simp [(h₂ p).left], refl },
     { simp [(h₂ p).right], refl }, }
 end
+
+@[simp]
+lemma emp_left_combine (hp : heap)
+: heap.emp <+ hp = hp :=
+by { funext y, simp [left_combine,heap.emp], }
+
+@[simp]
+lemma left_combine_emp (hp : heap)
+: hp <+ heap.emp = hp :=
+by { funext y, simp [left_combine,heap.emp], }
+
+@[simp]
+lemma heap_mk_nil_eq_emp (p : pointer)
+: heap.mk p [] = heap.emp := by simp [heap.mk]
+
+lemma some_insert_left_eq_part {hp₀ hp₁ : heap}
+  (h : hp₀ ## hp₁)
+: some (hp₀ <+ hp₁) = part (some hp₀) (some hp₁) :=
+sorry
 
 end heap

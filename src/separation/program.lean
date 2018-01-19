@@ -20,6 +20,13 @@ structure hstate :=
 @[reducible]
 def program := state_t hstate nonterm
 
+def is_free {s : hstate} {p : pointer}
+  (h : p ≥ s.next)
+  (vs : list word)
+: heap.mk p vs ## s.heap :=
+sorry
+
+
 export nonterm (run_to)
 
 namespace program
@@ -188,7 +195,7 @@ if h : (s.heap p).is_some then
       begin
         intros q h',
         simp [heap.insert],
-        by_cases p = q with h'',
+        by_cases h'' : p = q,
         { rw [if_pos h''],
           exfalso, subst q,
           have h₃ := s.free p h',
