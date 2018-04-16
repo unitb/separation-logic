@@ -8,7 +8,7 @@ import util.control.monad.non_termination
 import separation.heap
 import separation.program
 import separation.specification
-import separation.tactics
+import separation.tactic
 
 universes u v w w'
 
