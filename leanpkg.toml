@@ -1,9 +1,9 @@
 [package]
 name = "separation-logic"
 version = "0.1"
-lean_version = "master"
+lean_version = "nightly-2018-04-06"
 path = "src"
 
 [dependencies]
-mathlib = {git = "https://github.com/leanprover/mathlib", rev = "0ac694c04ab68428e65671f20cf0696280689b56"}
-lean-lib = {git = "https://github.com/unitb/lean-lib", rev = "f1a0492bcd7d3881ce93b1fba5e41e6ab3d02ce5"}
+mathlib = {git = "https://github.com/leanprover/mathlib", rev = "f2361dc21f6d5798ea075a80a6846eea63b48279"}
+lean-lib = {git = "https://github.com/unitb/lean-lib", rev = "1ccbd0da9d71eac905559f8ca6768098f5ed617e"}

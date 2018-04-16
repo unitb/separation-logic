@@ -1,6 +1,7 @@
 
 import data.bitvec
 import data.dlist
+import util.meta.tactic
 import util.logic
 import util.control.applicative
 import util.control.monad.non_termination
@@ -16,7 +17,6 @@ structure hstate :=
   (heap : heap)
   (next : ℕ)
   (free : ∀ p, p ≥ next → heap p = none)
-
 @[reducible]
 def program := state_t hstate nonterm
 
@@ -35,21 +35,27 @@ variables {α : Type u} {β : Type}
 
 section mfix
 
+@[extensionality]
+protected def ext (x y : program β)
+: (∀ i, x.run i = y.run i) → x = y :=
+by { casesm* program _, intro,
+     congr, apply funext a, }
+
 protected def le (x y : program β) : Prop :=
-∀ i, x i ≤ y i
+∀ i, x.run i ≤ y.run i
 
 instance : has_le (program β) :=
  { le := program.le }
 
 protected def le_refl (x : program β)
 : x ≤ x :=
-by { introv i, refl }
+by { intro, refl }
 
 protected def le_antisymm (x y : program β)
   (h₀ : x ≤ y)
   (h₁ : y ≤ x)
 : x = y :=
-by { apply funext, intro i, apply le_antisymm (h₀ i) (h₁ i) }
+by { ext i, apply le_antisymm (h₀ i) (h₁ i) }
 
 protected def le_trans (x y z : program β)
   (h₀ : x ≤ y)
@@ -68,16 +74,20 @@ instance has_mono_program : has_mono program :=
  , le := by apply_instance
  , input_t  := hstate
  , result_t := λ α, α × hstate
- , run_to := λ α m i s s', nonterm.run_to (m s) i s'
+ , run_to := λ α m i s s', nonterm.run_to (m.run s) i s'
  , run_to_imp_run_to_of_le := by { introv h, apply h } }
 
 @[reducible]
-protected def monotonic (f : (α → program β) → α → program β) :=
-monotonic (λ rec, uncurry' $ f $ curry rec)
+protected def monotonic (f : (α → program β) → α → program β) : Prop :=
+@monotonic nonterm _ (α × hstate) (β × hstate) $
+λ rec, uncurry' $
+λ x y, (f (state_t.mk ∘ curry rec) x).run y
 
 protected lemma lift_mono {α β} (f : (α → program β) → α → program β)
   (h : monotonic f)
-: @monotonic nonterm _ (α × hstate) (β × hstate) $ λ rec, uncurry' (f $ curry rec) :=
+: @monotonic nonterm _ (α × hstate) (β × hstate) $
+  λ rec, uncurry' $
+  λ x y, (f (state_t.mk ∘ curry rec) x).run y :=
 begin
   unfold monotonic,
   intros v₀ i v' v1 v2 h' x,
@@ -90,8 +100,7 @@ protected def mfix {α : Type} {β : Type}
   (f : (α → program β) → α → program β)
   (Hf : monotonic f)
 : α → program β :=
-curry (@nonterm.fix (α × hstate) (β × hstate) (λ g, uncurry' (f $ curry g))
-(program.lift_mono _ Hf))
+ state_t.mk ∘ curry (@nonterm.fix (α × hstate) (β × hstate) _ (program.lift_mono _ Hf))
 
 -- @[reducible]
 -- def monotonic2 {α : Type} {γ : Type} {β : Type}
@@ -173,7 +182,7 @@ instance has_fix_program : has_fix program :=
  , pre_fixpoint := by { introv, apply program.pre_fixpoint } }
 
 def read (p : pointer) : program word := do
-h ← state_t.read,
+h ← state_t.get,
 state_t.lift $ option.rec_on (h.heap p) nonterm.diverge return
 
 meta def decide : tactic unit :=
@@ -186,9 +195,9 @@ example : ∀ x : read_nth 100 1 2 = return 3, true :=
 by { intro, trivial }
 
 def write (p : pointer) (v : word) : program unit := do
-s ← state_t.read,
+s ← state_t.get,
 if h : (s.heap p).is_some then
-  state_t.write
+  state_t.put
     { s with
       heap := s.heap.insert p v
     , free :=
@@ -214,9 +223,9 @@ def modify_nth (p : pointer) (i j : ℕ) (f : word → word) (h : i < j . decide
 modify (p+i) f
 
 def alloc (vs : list word) : program pointer := do
-s ← state_t.read,
+s ← state_t.get,
 let r := s.next + 1,
-state_t.write
+state_t.put
   { s with next := s.next + vs.length,
            heap := heap.mk r vs <+ s.heap,
            free := sorry },
@@ -226,8 +235,8 @@ def alloc1 (v : word) : program pointer := do
 alloc [v]
 
 def free (p : pointer) (ln : ℕ) : program unit := do
-s ← state_t.read,
-state_t.write
+s ← state_t.get,
+state_t.put
   { s with heap := heap.delete p ln s.heap,
            free := sorry }
 

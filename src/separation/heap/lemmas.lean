@@ -140,8 +140,8 @@ begin
   specialize H₂ p,
   rw or_iff_not_imp at H₁ H₂,
   split
-  ; xassumption
-  ; xassumption,
+  ; apply_assumption
+  ; apply_assumption,
 end
 
 lemma disjoint_part' {h₁ h₂ h₃ : heap}

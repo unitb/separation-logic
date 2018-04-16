@@ -12,7 +12,7 @@ open applicative
 open lean.parser
 open interactive
 open interactive.types
-open tactic has_map list nat separation
+open tactic functor list nat separation
 
 local postfix `?`:9001 := optional
 local postfix *:9001 := many
@@ -371,12 +371,12 @@ do `(sat %%hd %%spec) ← target,
    gs ← get_goals,
    set_goals [p₀],
    simp_h_entails,
-   all_goals (try $ `[apply of_as_true, apply trivial] <|> auto),
+   all_goals (try $ `[apply of_as_true, apply trivial] <|> solve_by_elim),
    done,
    set_goals [p₁],
    intro1,
    simp_h_entails,
-   all_goals (try $ `[apply of_as_true, apply trivial] <|> auto),
+   all_goals (try $ `[apply of_as_true, apply trivial] <|> solve_by_elim),
    done,
    set_goals gs,
    tactic.apply r,
@@ -391,7 +391,7 @@ do last_step' spec,
       intro_unit `_,
       ac_match',
       all_goals (try assumption)) <|> fail "second solve1",
-   all_goals (try $ `[apply of_as_true, apply trivial] <|> auto)
+   all_goals (try $ `[apply of_as_true, apply trivial] <|> solve_by_elim)
 
 -- meta def himp_zoom : tactic unit :=
 -- do `(%%lhs =*> %%rhs) ← target | failed,
@@ -413,7 +413,7 @@ example (e₁ e₂ e₃ e₄ e₅ e₆ : hprop)
 : e₃ :*: e₁ :*: e₅ :*: e₂ :*: e₄ =*> e₂ :*: e₆ :=
 begin
   monotonicity1,
-  auto
+  solve_by_elim
 end
 
 example (e₁ e₂ e₃ e₄ e₅ e₆ : hprop)
@@ -421,7 +421,7 @@ example (e₁ e₂ e₃ e₄ e₅ e₆ : hprop)
 : e₃ :*: e₁ :*: e₅ :*: e₂ :*: e₄ =*> e₂ :*: e₃ :=
 begin
   monotonicity1,
-  auto
+  solve_by_elim
 end
 
 end tactic.interactive

@@ -110,7 +110,7 @@ def sat {α} (p : program α) (s : spec α) : Prop :=
 ∀ (σ : hstate) hp₀ hp₁,
    some σ.heap = part (some hp₀) (some hp₁) →
    s.pre.apply hp₀ →
-(∃ r σ' hp', p σ ~> (r, σ') ∧
+(∃ r σ' hp', p.run σ ~> (r, σ') ∧
             some σ'.heap = part (some hp') (some hp₁) ∧
             (s.post r).apply hp')
 
@@ -203,7 +203,7 @@ lemma s_imp_trans {p : hprop} (q : hprop) {r : hprop}
   (h₀ : p =*> q)
   (h₁ : q =*> r)
 : p =*> r :=
-by { lifted_pred using h₀ h₁, intro ; auto }
+by { lifted_pred using h₀ h₁, intro ; solve_by_elim }
 
 lemma s_exists_intro  {α : Type u}
   {p : hprop} {q : α → hprop} (x : α)
@@ -552,14 +552,14 @@ begin
   intros _ _ _ H₀ H₁,
   existsi [v,σ,hp₀],
   simp at *, simp [H₀,H₁],
-  simp [read,state_t.read,has_bind.bind,state_t_bind],
+  simp [read,return,has_bind.bind,state_t.bind],
   apply nonterm.yields_bind,
   apply nonterm.pure_yields,
   simp [points_to] at H₁,
-  simp [state_t_bind._match_1,state_t.lift],
+  simp [state_t.bind._match_1,state_t.lift],
   simp [H₁] at H₀,
   rw [← opt_apl_some (σ.heap) p,H₀,opt_apl_part_maplet],
-  simp [monad.pure_bind],
+  simp [pure_bind],
   apply nonterm.pure_yields,
   apply disjoint_of_is_some_part,
   apply is_some_of_eq_some σ.heap H₀,
@@ -608,7 +608,7 @@ begin
   unfold write,
   existsi (),
   split, existsi (hp₀.insert p v'),
-  simp [state_t.read_bind],
+  simp ,
   constructor_matching* (_ ∧ _),
   show heap.insert hp₀ p v' ⊨ p ↦ v',
   { change _ = _ at H₁,
@@ -617,7 +617,7 @@ begin
     by_cases h : p = x ;
     simp [heap.insert,maplet,h], },
   show _ ~> _,
-  { rw [dif_pos,state_t.write],
+  { rw [dif_pos,state_t.put],
     apply nonterm.pure_yields,
     simp [points_to] at H₁,
     rw [← opt_apl_some σ.heap,H₀,H₁,opt_apl_part_maplet ],
@@ -709,13 +709,10 @@ lemma alloc.spec (vs : list word)
 begin
   simp [alloc,sat],
   intros _ _ _ H₀ H₁,
-  simp [state_t.read_bind],
+  -- simp [state_t.get_bind],
   existsi σ.next+1,
   existsi { hstate . .. }, split,
-  { apply nonterm.yields_bind,
-    simp [state_t.write], apply nonterm.pure_yields,
-    simp only [state_t_bind._match_1],
-    apply nonterm.pure_yields, },
+  { apply nonterm.pure_yields, },
   have : ¬σ.next+1 = 0,
   { apply ne_of_gt,
     apply zero_lt_succ, },
@@ -744,10 +741,8 @@ begin
   introv H₀ H₁,
   existsi [()],
   split, existsi heap.emp,
-  simp [free,state_t.read,state_t.write],
-  split, simp [(>>=)],
-  simp [state_t_bind,monad.pure_bind],
-  apply nonterm.pure_yields,
+  simp [free,nonterm.pure_yields],
+  split, apply nonterm.pure_yields,
   simp, subst n,
   rw points_to_multiple_iff_eq_heap_mk at H₁,
   rw H₁ at H₀,
