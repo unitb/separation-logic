@@ -20,12 +20,12 @@ namespace separation
 
 namespace examples
 
-def swap_ptr (p q : pointer) : program unit := do
-t ← alloc1 0,
-copy t p,
-copy p q,
-copy q t,
-free1 t
+def swap_ptr (p q : pointer) : program unit :=
+do t ← alloc1 0,
+   copy t p,
+   copy p q,
+   copy q t,
+   free1 t
 
 lemma swap_ptr_spec (p q : pointer) (v₀ v₁ : word)
 : sat (swap_ptr p q) { pre := p ↦ v₀ :*: q ↦ v₁

@@ -16,16 +16,28 @@ namespace separation
 structure hstate :=
   (heap : heap)
   (next : ℕ)
-  (free : ∀ p, p ≥ next → heap p = none)
+  (free : ∀ p, next ≤ p → heap p = none)
 @[reducible]
 def program := state_t hstate nonterm
 
+local attribute [instance, priority 0] classical.prop_decidable
+
 def is_free {s : hstate} {p : pointer}
-  (h : p ≥ s.next)
+  (h : s.next ≤ p)
   (vs : list word)
 : heap.mk p vs ## s.heap :=
-sorry
-
+by { intro, apply or_iff_not_imp_left.mpr, intro, apply s.free,
+     apply le_trans h,
+     by_contradiction, apply a, clear a,
+     induction vs generalizing p; dsimp [heap.mk], { refl },
+     { simp [-heap.heap_mk_eq_none], split,
+       { have : p ≠ p_1,
+         { intro, apply a_1, subst p_1, },
+         simp! *,  },
+       apply vs_ih, apply le_trans h, simp [zero_le_one],
+       intro, apply a_1, transitivity; [skip, apply a],
+       simp [(≥),zero_le_one], },
+     { apply_instance } }
 
 export nonterm (run_to)
 
@@ -49,7 +61,7 @@ instance : has_le (program β) :=
 
 protected def le_refl (x : program β)
 : x ≤ x :=
-by { intro, refl }
+by { intro, apply le_refl _ }
 
 protected def le_antisymm (x y : program β)
   (h₀ : x ≤ y)
@@ -228,7 +240,8 @@ let r := s.next + 1,
 state_t.put
   { s with next := s.next + vs.length,
            heap := heap.mk r vs <+ s.heap,
-           free := sorry },
+           free := by { intros, simp!, split,
+                        { sorry }, sorry } },
 return r
 
 def alloc1 (v : word) : program pointer := do
@@ -238,7 +251,10 @@ def free (p : pointer) (ln : ℕ) : program unit := do
 s ← state_t.get,
 state_t.put
   { s with heap := heap.delete p ln s.heap,
-           free := sorry }
+           free := by { intros, induction ln generalizing p,
+                        apply s.free _ a,
+                        simp!, split_ifs, refl,
+                        apply_assumption } }
 
 def free1 (p : pointer) : program unit := do
 free p 1

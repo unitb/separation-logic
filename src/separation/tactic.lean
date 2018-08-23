@@ -2,6 +2,7 @@
 import data.dlist
 import separation.specification
 
+import tactic.monotonicity
 import util.meta.tactic
 
 universes u v
@@ -264,7 +265,7 @@ ac_match'
 example (e₁ e₂ e₃ : hprop)
 : e₁ :*: e₂ :*: e₃ = e₂ :*: e₃ :*: e₁ :=
 begin
-  monotonicity1,
+  ac_mono1,
   exact @rfl _ emp
 end
 
@@ -412,7 +413,7 @@ example (e₁ e₂ e₃ e₄ e₅ e₆ : hprop)
   (h : e₃ :*: e₁ :*: e₅ :*: e₄ =*> e₆)
 : e₃ :*: e₁ :*: e₅ :*: e₂ :*: e₄ =*> e₂ :*: e₆ :=
 begin
-  monotonicity1,
+  ac_mono1,
   solve_by_elim
 end
 
@@ -420,7 +421,7 @@ example (e₁ e₂ e₃ e₄ e₅ e₆ : hprop)
   (h : e₁ :*: e₅ :*: e₄ =*> emp)
 : e₃ :*: e₁ :*: e₅ :*: e₂ :*: e₄ =*> e₂ :*: e₃ :=
 begin
-  monotonicity1,
+  ac_mono1,
   solve_by_elim
 end
 

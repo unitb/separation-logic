@@ -1,5 +1,9 @@
 
 import util.meta.tactic
+import data.nat.basic
+import util.data.nat
+import util.data.order
+import tactic
 
 import separation.heap.basic
 
@@ -573,9 +577,24 @@ by { funext y, simp [left_combine,heap.emp], }
 lemma heap_mk_nil_eq_emp (p : pointer)
 : heap.mk p [] = heap.emp := by simp [heap.mk]
 
+-- #check [3] ++ (3 : ℕ)
+
+@[simp]
+lemma heap_mk_eq_none (p p' : pointer) (vs : list word)
+: heap.mk p vs p' = none ↔ p' < p ∨ p + vs.length ≤ p' :=
+begin
+  induction vs generalizing p,
+  { split; intro, apply lt_or_le,
+    refl, },
+  { simp!, split_ifs,
+    { subst p', simp [lt_irrefl,nat.one_add,nat.zero_lt_succ],  },
+    { simp [add_assoc,vs_ih], apply or_congr; [skip, refl], replace h := ne.symm h,
+      simp [nat.lt_succ_iff,le_iff_lt h] } }
+end
+
 lemma some_insert_left_eq_part {hp₀ hp₁ : heap}
   (h : hp₀ ## hp₁)
 : some (hp₀ <+ hp₁) = part (some hp₀) (some hp₁) :=
-sorry
+by dsimp [part]; split_ifs; ext; simp!
 
 end heap

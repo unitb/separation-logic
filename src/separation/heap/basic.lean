@@ -20,6 +20,8 @@ to_word :: (to_ptr : ℕ)
 instance : has_zero word := ⟨ ⟨ 0 ⟩ ⟩
 instance : has_one word := ⟨ ⟨ 1 ⟩ ⟩
 instance : has_add word := ⟨ λ x y, ⟨ x.to_ptr + y.to_ptr ⟩ ⟩
+instance : partial_order pointer :=
+by apply_instance
 
 def heap := pointer → option word
 
